@@ -12,6 +12,19 @@ Changing agent presets does not solve that mid-session. `dsh-autonomy` changes t
 
 The plugin was built in response to [DeepSeek Harness Discussion #1644](https://github.com/deepseek-ai/deepseek-harness/discussions/1644).
 
+## Token control, not a token cap
+
+Chat mode can reduce accidental token spend when you only need an answer, explanation, or tightly guided collaboration.
+
+It does this in two ways:
+
+- Tool schemas are removed from the model request.
+- Autonomous tool loops and follow-up execution steps are prevented.
+
+This can avoid the kind of runaway agent session described in [DeepSeek Harness Discussion #1644](https://github.com/deepseek-ai/deepseek-harness/discussions/1644).
+
+`dsh-autonomy` is not a token budget manager or a hard usage limit. Conversation history, prompt size, model output, and provider pricing still determine the final cost. It gives you direct control over when agentic execution is allowed.
+
 | Mode | Model sees tools | Tool execution | Typical turn |
 | --- | --- | --- | --- |
 | **Chat** | No | Denied | One text response |
@@ -21,12 +34,22 @@ The plugin was built in response to [DeepSeek Harness Discussion #1644](https://
 
 This release targets DeepSeek Harness `0.1.0-rc.6`.
 
+You need a working DeepSeek Harness CLI. Verify it without requiring a global installation:
+
+```sh
+npx @deepseek-ai/dsh --version
+```
+
+If your existing Harness setup does not provide a global `dsh` command, keep using the `npx @deepseek-ai/dsh` form shown below. It invokes the official CLI directly, so a separate global `dsh` installation is not required.
+
 From npm:
 
 ```sh
 npx @deepseek-ai/dsh plugin --profile web add dsh-autonomy
 npx @deepseek-ai/dsh web
 ```
+
+If DSH Web was already running during installation, stop it with `Ctrl+C` and start it again. An existing process does not hot-load newly installed plugins. If the default port is already occupied, stop the old DSH process or test on another port with `npx @deepseek-ai/dsh web --port 3081`.
 
 From a local checkout:
 
