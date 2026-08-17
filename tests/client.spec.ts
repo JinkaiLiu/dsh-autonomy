@@ -53,4 +53,55 @@ describe('Web client registration', () => {
     await expect(registration?.inject(sessionId).setMode('chat')).resolves.toBeNull()
     expect(executed).toEqual([{ sessionId, line: '/autonomy chat' }])
   })
+
+  it('returns actionable messages for remote and command failures', async () => {
+    let registration: {
+      name: string
+      id: string
+      order: number
+      inject: (sessionId: SessionId) => AutonomyToggleInjected
+    } | undefined
+    const responses = [
+      {
+        ok: false as const,
+        error: { message: 'relay unavailable', code: 'REMOTE_UNAVAILABLE' },
+      },
+      { ok: true as const, value: undefined },
+      {
+        ok: true as const,
+        value: {
+          commandId: 'client-test-command',
+          result: { kind: 'error' as const, text: 'Usage: /autonomy <chat|agent>' },
+        },
+      },
+    ]
+
+    const ctx = {
+      slots: {
+        inject(_name: string, mount: () => unknown) {
+          return mount()
+        },
+        register(options: typeof registration, _component: unknown) {
+          registration = options
+          return () => {}
+        },
+      },
+      remote: {
+        commands: {
+          async execute(_sessionId: SessionId, _line: string) {
+            return responses.shift()
+          },
+        },
+      },
+    } as unknown as ClientContext
+
+    apply(ctx)
+
+    const controls = registration?.inject('client-errors' as SessionId)
+    await expect(controls?.setMode('chat')).resolves.toBe(
+      'relay unavailable (REMOTE_UNAVAILABLE)',
+    )
+    await expect(controls?.setMode('agent')).resolves.toBe('unknown command: /autonomy')
+    await expect(controls?.setMode('chat')).resolves.toBe('Usage: /autonomy <chat|agent>')
+  })
 })
