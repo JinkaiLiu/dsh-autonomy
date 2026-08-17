@@ -62,6 +62,17 @@ npx @deepseek-ai/dsh web
 
 通过 GitHub 源码安装时，DSH 的 pnpm profile 必须允许本包的 `prepare` 构建。registry release 或预构建 tarball 已包含构建产物，不需要安装期构建权限。
 
+## 卸载
+
+从安装时使用的同一个 profile 中移除 bundle，然后重启 DSH Web：
+
+```sh
+npx @deepseek-ai/dsh plugin --profile web remove dsh-autonomy
+npx @deepseek-ai/dsh web
+```
+
+插件不会创建单独的数据库或配置目录。历史 `/autonomy` 命令记录仍属于会话日志，但插件移除后不会再产生作用。
+
 ## 使用
 
 点击输入框上方的 `Chat` 或 `Agent`，也可以输入：
@@ -91,6 +102,28 @@ Chat 模式使用三个互相对齐的层次：
 
 Chat 模式不会削弱或替换 DSH 的 sandbox 与 permission policy。Agent 模式恢复组合后的原始工具行为，现有策略仍然决定这些工具能否执行。
 
+## 权限与数据
+
+与其他受信任的 Cordis 插件一样，`dsh-autonomy` 运行在 DSH Host 进程内。它：
+
+- 不发起网络请求，不收集遥测，也不读取 provider 凭据；
+- 不读取或写入工作区文件；
+- 只通过 DSH 现有的会话命令日志记录模式切换；
+- 只修改对应会话的工具可见性和执行策略；
+- 浏览器控件只向本地 DSH command 服务发送 `/autonomy chat` 或 `/autonomy agent`。
+
+安装任何第三方 DSH 插件，都会让其代码以 DSH 进程的权限执行。在持有敏感数据的环境中安装前，请检查源码和包内容。
+
+## 故障排查
+
+- **没有看到切换控件：** 安装后重启 DSH Web，确认插件加入的是 `web` profile，然后刷新浏览器。
+- **出现 `unknown command: /autonomy`：** Web 客户端已加载，但 Host bundle 没有加载。停止所有旧 DSH 进程，再使用同一个 profile 启动。
+- **默认端口被占用：** 停止旧进程，或改用其他端口，例如 `npx @deepseek-ai/dsh web --port 3081`。
+- **从 GitHub 源码安装时要求构建授权：** 在对应 profile 中允许本包的 `prepare`，或改用预构建 npm release。
+- **切到 Chat 时工具已经开始运行：** 请使用 Stop。模式切换无法取消或回滚已经通过执行门禁的工作。
+
+报告问题时，请提供 DSH 版本、插件版本、安装命令、使用的 profile、操作系统和首条相关 Host 错误。
+
 ## 配置
 
 在 profile 的 `cordis.patch.yml` 中覆盖已安装行：
@@ -117,6 +150,8 @@ pnpm run pack:check
 ```
 
 本包包含一个 DSH Host 插件和一个浏览器客户端 bundle。测试使用真实的 DSH session、command、system-prompt、tool、agent-scope 与 execution 服务，仅对 Agent 对象使用最小替身。
+
+CI 会执行类型检查、Host 与客户端测试、生产构建、打包文件检查和 `publint` 包验证。
 
 ## 状态
 

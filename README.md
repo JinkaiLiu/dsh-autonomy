@@ -66,6 +66,17 @@ The package declares a DSH bundle, so `dsh plugin` adds both its host behavior a
 
 For a GitHub install, DSH's pnpm profile must allow this package's `prepare` build before retrying the add. A registry release or packed tarball ships built files and needs no install-time build permission.
 
+## Uninstall
+
+Remove the bundle from the same profile where it was installed, then restart DSH Web:
+
+```sh
+npx @deepseek-ai/dsh plugin --profile web remove dsh-autonomy
+npx @deepseek-ai/dsh web
+```
+
+The plugin does not keep a separate database or configuration directory. Historical `/autonomy` command records remain part of the session log, but have no effect after the plugin is removed.
+
 ## Use
 
 Click `Chat` or `Agent` above the composer, or run:
@@ -95,6 +106,28 @@ Switching to Chat prevents tool calls that have not passed the execution gate ye
 
 Chat mode does not weaken or replace DSH sandbox and permission policies. Agent mode restores the composed tool behavior; the existing policies still decide what those tools may do.
 
+## Permissions and data
+
+`dsh-autonomy` runs in the DSH host process, as other trusted Cordis plugins do. It:
+
+- does not make network requests, collect telemetry, or read provider credentials;
+- does not read or write workspace files;
+- records mode changes only through DSH's existing session command log;
+- changes tool visibility and execution policy only for the affected session;
+- sends `/autonomy chat` or `/autonomy agent` from the browser control to the local DSH command service.
+
+Installing any third-party DSH plugin executes its code with the privileges of the DSH process. Review the source and package contents before installing it in an environment that holds sensitive data.
+
+## Troubleshooting
+
+- **The switch is missing:** restart the DSH Web process after installation, confirm that the plugin was added to the `web` profile, then refresh the browser.
+- **`unknown command: /autonomy`:** the Web client loaded but the host bundle did not. Stop every old DSH process and start the same profile again.
+- **The default port is occupied:** stop the older process or start with another port, for example `npx @deepseek-ai/dsh web --port 3081`.
+- **A GitHub-source install asks for build approval:** allow the package's `prepare` script in that profile, or use the prebuilt npm release.
+- **A tool was already running when Chat was selected:** use Stop. The mode switch cannot cancel or roll back work that already passed the execution gate.
+
+When reporting a problem, include the DSH version, plugin version, install command, active profile, operating system, and the first relevant host error.
+
 ## Configuration
 
 Override the installed row in the profile's `cordis.patch.yml`:
@@ -120,7 +153,9 @@ pnpm run check
 pnpm run pack:check
 ```
 
-The package contains one DSH host plugin and one browser client bundle. Tests use the real DSH session, command, system-prompt, tool, agent-scope, and execution services; only the Agent object is kept minimal. The release gate also installs the packed tarball into a clean DSH home and verifies Web UI switching plus cold-session recovery.
+The package contains one DSH host plugin and one browser client bundle. Tests use the real DSH session, command, system-prompt, tool, agent-scope, and execution services; only the Agent object is kept minimal.
+
+CI runs type checking, the host and client test suites, a production build, packed-file inspection, and `publint` package validation.
 
 ## Status
 
