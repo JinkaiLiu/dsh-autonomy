@@ -3,7 +3,12 @@ import { Context } from '@deepseek-ai/cordis'
 import AgentRegistry, { agentEvents, type Agent } from '@deepseek-ai/dsh-agent'
 import CommandRuntime, { CommandId } from '@deepseek-ai/dsh-commands'
 import { CallId, createUserMessage } from '@deepseek-ai/dsh-llm'
-import SessionStore, { Session, SessionId, type UserMessage } from '@deepseek-ai/dsh-session'
+import SessionStore, {
+  Session,
+  SessionId,
+  type SessionEvent,
+  type UserMessage,
+} from '@deepseek-ai/dsh-session'
 import { createScope } from '@deepseek-ai/dsh-scope'
 import SystemPrompt from '@deepseek-ai/dsh-system-prompt'
 import ToolRuntime, { defineTool } from '@deepseek-ai/dsh-tools'
@@ -46,8 +51,12 @@ async function setup(config: Partial<Config> | null = CONFIG): Promise<Context> 
   return ctx
 }
 
-async function createAgent(ctx: Context, id: string): Promise<Agent> {
-  const session = Session.create(SessionId(id))
+async function createAgent(
+  ctx: Context,
+  id: string,
+  seed?: readonly SessionEvent[],
+): Promise<Agent> {
+  const session = Session.create(SessionId(id), seed)
   const agent = {
     id: SessionId(id),
     session,
@@ -164,6 +173,46 @@ describe('Chat and Agent behavior', () => {
     const result = await executeProbe(ctx, agent)
     expect(result.isError).toBe(false)
     expect(result.content).toEqual([{ type: 'text', text: 'ran probe' }])
+  })
+
+  it('keeps mode selection and tool policy isolated between sessions', async () => {
+    const ctx = await setup()
+    const chatAgent = await createAgent(ctx, 'isolated-chat')
+    const agentAgent = await createAgent(ctx, 'isolated-agent')
+
+    await command(ctx, chatAgent, 'chat')
+
+    expect(foldAutonomyMode(chatAgent.session.events)).toBe('chat')
+    expect(foldAutonomyMode(agentAgent.session.events)).toBe('agent')
+    expect((await assembly(ctx, chatAgent)).tools).toEqual([])
+    expect((await assembly(ctx, agentAgent)).tools.map(tool => tool.name)).toEqual(['probe'])
+    expect((await executeProbe(ctx, chatAgent)).isError).toBe(true)
+    expect((await executeProbe(ctx, agentAgent)).isError).toBe(false)
+
+    await command(ctx, agentAgent, 'chat')
+    await command(ctx, chatAgent, 'agent')
+
+    expect((await assembly(ctx, chatAgent)).tools.map(tool => tool.name)).toEqual(['probe'])
+    expect((await assembly(ctx, agentAgent)).tools).toEqual([])
+    expect((await executeProbe(ctx, chatAgent)).isError).toBe(false)
+    expect((await executeProbe(ctx, agentAgent)).isError).toBe(true)
+  })
+
+  it('recovers the selected mode from a replayed session log', async () => {
+    const originalCtx = await setup()
+    const originalAgent = await createAgent(originalCtx, 'before-restart')
+    await command(originalCtx, originalAgent, 'chat')
+
+    const restoredCtx = await setup()
+    const restoredAgent = await createAgent(
+      restoredCtx,
+      'after-restart',
+      originalAgent.session.events,
+    )
+
+    expect(foldAutonomyMode(restoredAgent.session.events)).toBe('chat')
+    expect((await assembly(restoredCtx, restoredAgent)).tools).toEqual([])
+    expect((await executeProbe(restoredCtx, restoredAgent)).isError).toBe(true)
   })
 
   it('enforces and durably records an in-turn Chat selection immediately', async () => {
