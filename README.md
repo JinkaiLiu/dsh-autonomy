@@ -1,5 +1,7 @@
 # dsh-autonomy
 
+English | [简体中文](README.zh.md)
+
 Switch between **Chat** and **Agent** without leaving your DeepSeek Harness session.
 
 `dsh-autonomy` adds an always-visible `Chat | Agent` control on a dedicated row above the Web composer. It never overlays the text area or consumes space in the composer's tool row. The selection belongs to the current session, survives reloads and resumes, and follows a fork through the durable session log.
