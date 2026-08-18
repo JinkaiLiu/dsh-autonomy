@@ -1,6 +1,6 @@
 {
   "name": "dsh-autonomy",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Switch between Chat and Agent without leaving your DeepSeek Harness session.",
   "type": "module",
   "main": "lib/index.js",
@@ -24,6 +24,9 @@
     "lib",
     "cordis.patch.yml",
     "README.md",
+    "README.zh.md",
+    "CHANGELOG.md",
+    "SECURITY.md",
     "LICENSE"
   ],
   "dsh": {
