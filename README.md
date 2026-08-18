@@ -34,7 +34,7 @@ This can avoid the kind of runaway agent session described in [DeepSeek Harness 
 
 ## Install
 
-This release targets DeepSeek Harness `0.1.0-rc.6`.
+The plugin supports DeepSeek Harness `0.1.0-rc.6` and is verified against `0.1.0-rc.7`.
 
 You need a working DeepSeek Harness CLI. Verify it without requiring a global installation:
 
@@ -102,7 +102,7 @@ This is intentionally stronger than a prompt-only "please do not use tools" mode
 
 ## Important boundary
 
-Switching to Chat prevents tool calls that have not passed the execution gate yet. It cannot undo a tool body that already started or roll back an earlier side effect. Use the existing Stop control when you need to cancel an active turn.
+Switching to Chat prevents tool calls that have not passed the execution gate yet. A tool body that is already running is not cancelled by the mode change, and earlier side effects are not rolled back. No action is required if you want that operation to finish; use the existing Stop control only when you want to cancel the active turn.
 
 Chat mode does not weaken or replace DSH sandbox and permission policies. Agent mode restores the composed tool behavior; the existing policies still decide what those tools may do.
 
@@ -124,7 +124,7 @@ Installing any third-party DSH plugin executes its code with the privileges of t
 - **`unknown command: /autonomy`:** the Web client loaded but the host bundle did not. Stop every old DSH process and start the same profile again.
 - **The default port is occupied:** stop the older process or start with another port, for example `npx @deepseek-ai/dsh web --port 3081`.
 - **A GitHub-source install asks for build approval:** allow the package's `prepare` script in that profile, or use the prebuilt npm release.
-- **A tool was already running when Chat was selected:** use Stop. The mode switch cannot cancel or roll back work that already passed the execution gate.
+- **A tool was already running when Chat was selected:** no action is required if you want it to finish. Use Stop only if you want to cancel the active turn; the mode switch cannot roll back an earlier side effect.
 
 When reporting a problem, include the DSH version, plugin version, install command, active profile, operating system, and the first relevant host error.
 

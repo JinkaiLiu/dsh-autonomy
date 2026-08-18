@@ -231,6 +231,46 @@ describe('Chat and Agent behavior', () => {
     expect(foldAutonomyMode(agent.session.events)).toBe('chat')
   })
 
+  it('lets an already-running tool settle while blocking later calls', async () => {
+    const ctx = await setup()
+    let markStarted!: () => void
+    let finishTool!: (value: string) => void
+    const started = new Promise<void>((resolve) => { markStarted = resolve })
+    const result = new Promise<string>((resolve) => { finishTool = resolve })
+    ctx.tools.register(defineTool({
+      name: 'slow-probe',
+      description: 'A test tool that remains active until released.',
+      parameters: {},
+      output: {
+        schema: { type: 'string' },
+        render: (_args, value) => [{ type: 'text', text: value }],
+      },
+      execute: async () => {
+        markStarted()
+        return result
+      },
+    }))
+    const agent = await createAgent(ctx, 'already-running')
+
+    const running = ctx.tools.execute({
+      callId: CallId('call-already-running'),
+      name: 'slow-probe',
+      arguments: {},
+      agent,
+      signal: new AbortController().signal,
+    })
+    await started
+
+    await command(ctx, agent, 'chat')
+    finishTool('slow probe finished')
+
+    await expect(running).resolves.toMatchObject({
+      isError: false,
+      content: [{ type: 'text', text: 'slow probe finished' }],
+    })
+    await expect(executeProbe(ctx, agent)).resolves.toMatchObject({ isError: true })
+  })
+
   it('does not change mode when the command input is invalid', async () => {
     const ctx = await setup()
     const agent = await createAgent(ctx, 'invalid')

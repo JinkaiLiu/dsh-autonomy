@@ -24,18 +24,16 @@ describe('Web client registration', () => {
           return () => {}
         },
       },
-      remote: {
-        commands: {
-          async execute(sessionId: SessionId, line: string) {
-            executed.push({ sessionId, line })
-            return {
-              ok: true as const,
-              value: {
-                commandId: 'client-test-command',
-                result: { kind: 'success' as const },
+      sessions: {
+        binding(sessionId: SessionId) {
+          return {
+            session: {
+              async command(line: string) {
+                executed.push({ sessionId, line })
+                return { ok: true as const, value: { matched: true } }
               },
-            }
-          },
+            },
+          }
         },
       },
     } as unknown as ClientContext
@@ -54,7 +52,7 @@ describe('Web client registration', () => {
     expect(executed).toEqual([{ sessionId, line: '/autonomy chat' }])
   })
 
-  it('returns actionable messages for remote and command failures', async () => {
+  it('returns actionable messages for session, transport, and admission failures', async () => {
     let registration: {
       name: string
       id: string
@@ -66,15 +64,9 @@ describe('Web client registration', () => {
         ok: false as const,
         error: { message: 'relay unavailable', code: 'REMOTE_UNAVAILABLE' },
       },
-      { ok: true as const, value: undefined },
-      {
-        ok: true as const,
-        value: {
-          commandId: 'client-test-command',
-          result: { kind: 'error' as const, text: 'Usage: /autonomy <chat|agent>' },
-        },
-      },
+      { ok: true as const, value: { matched: false } },
     ]
+    let available = true
 
     const ctx = {
       slots: {
@@ -86,11 +78,16 @@ describe('Web client registration', () => {
           return () => {}
         },
       },
-      remote: {
-        commands: {
-          async execute(_sessionId: SessionId, _line: string) {
-            return responses.shift()
-          },
+      sessions: {
+        binding(_sessionId: SessionId) {
+          if (!available) return undefined
+          return {
+            session: {
+              async command(_line: string) {
+                return responses.shift()
+              },
+            },
+          }
         },
       },
     } as unknown as ClientContext
@@ -102,6 +99,7 @@ describe('Web client registration', () => {
       'relay unavailable (REMOTE_UNAVAILABLE)',
     )
     await expect(controls?.setMode('agent')).resolves.toBe('unknown command: /autonomy')
-    await expect(controls?.setMode('chat')).resolves.toBe('Usage: /autonomy <chat|agent>')
+    available = false
+    await expect(controls?.setMode('chat')).resolves.toBe('session unavailable')
   })
 })

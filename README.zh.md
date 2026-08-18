@@ -32,7 +32,7 @@
 
 ## 安装
 
-当前版本面向 DeepSeek Harness `0.1.0-rc.6`。
+插件支持 DeepSeek Harness `0.1.0-rc.6`，并已针对 `0.1.0-rc.7` 完成验证。
 
 先确认 DeepSeek Harness CLI 可用，不要求全局安装：
 
@@ -98,7 +98,7 @@ Chat 模式使用三个互相对齐的层次：
 
 ## 重要边界
 
-切到 Chat 会阻止尚未通过执行门禁的工具调用，但不能撤销已经开始的工具，也不能回滚更早的副作用。需要取消当前回合时，请使用现有的 Stop 控件。
+切到 Chat 会阻止尚未通过执行门禁的工具调用。已经进入工具主体的操作不会因模式切换而取消，更早产生的副作用也不会回滚。如果你希望该操作正常完成，无需再做什么；只有希望取消当前回合时，才需要使用现有的 Stop 控件。
 
 Chat 模式不会削弱或替换 DSH 的 sandbox 与 permission policy。Agent 模式恢复组合后的原始工具行为，现有策略仍然决定这些工具能否执行。
 
@@ -120,7 +120,7 @@ Chat 模式不会削弱或替换 DSH 的 sandbox 与 permission policy。Agent �
 - **出现 `unknown command: /autonomy`：** Web 客户端已加载，但 Host bundle 没有加载。停止所有旧 DSH 进程，再使用同一个 profile 启动。
 - **默认端口被占用：** 停止旧进程，或改用其他端口，例如 `npx @deepseek-ai/dsh web --port 3081`。
 - **从 GitHub 源码安装时要求构建授权：** 在对应 profile 中允许本包的 `prepare`，或改用预构建 npm release。
-- **切到 Chat 时工具已经开始运行：** 请使用 Stop。模式切换无法取消或回滚已经通过执行门禁的工作。
+- **切到 Chat 时工具已经开始运行：** 如果希望它正常完成，无需再做什么。只有希望取消当前回合时才使用 Stop；模式切换无法回滚更早产生的副作用。
 
 报告问题时，请提供 DSH 版本、插件版本、安装命令、使用的 profile、操作系统和首条相关 Host 错误。
 

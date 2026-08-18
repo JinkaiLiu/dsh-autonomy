@@ -273,8 +273,13 @@ export function apply(ctx: Context, config?: Partial<Config>): void {
           syncRestriction(agent)
           throw cause
         }
-        const label = mode === 'chat' ? 'Chat' : 'Agent'
-        return { kind: 'success', text: `${label} mode selected.` }
+        if (mode === 'chat') {
+          return {
+            kind: 'success',
+            text: 'Chat mode selected. Further tool calls are blocked. An action already in progress is not cancelled; use Stop to end it.',
+          }
+        }
+        return { kind: 'success', text: 'Agent mode selected. Full tool access is restored.' }
       },
     })
   })

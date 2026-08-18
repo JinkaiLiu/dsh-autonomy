@@ -2,6 +2,18 @@
 
 All notable changes to `dsh-autonomy` are documented here.
 
+## Unreleased
+
+### Changed
+
+- Clarified that Chat keeps the current session context, blocks later tool calls, and does not cancel an action already in progress.
+- Kept the existing Stop control as the explicit way to cancel an active turn.
+
+### Verification
+
+- Added a regression test proving that an already-running tool can settle after switching to Chat while later tool calls are denied.
+- Moved the development test environment to DeepSeek Harness `0.1.0-rc.7` while retaining the `0.1.0-rc.6` peer compatibility floor.
+
 ## 0.1.1 - 2026-08-17
 
 This is a release-hardening update with no runtime behavior changes.
