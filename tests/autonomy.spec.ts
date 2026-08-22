@@ -76,12 +76,18 @@ async function createAgent(
   return agent
 }
 
+async function executeCommand(ctx: Context, agent: Agent, line: string) {
+  const execute = ctx.commands.execute as unknown as (...args: unknown[]) =>
+    ReturnType<typeof ctx.commands.execute>
+  const signal = new AbortController().signal
+  const args = execute.length >= 4
+    ? [agent, line, [], signal]
+    : [agent, line, signal]
+  return Reflect.apply(execute, ctx.commands, args)
+}
+
 async function command(ctx: Context, agent: Agent, mode: 'chat' | 'agent') {
-  return ctx.commands.execute(
-    agent,
-    `/autonomy ${mode}`,
-    new AbortController().signal,
-  )
+  return executeCommand(ctx, agent, `/autonomy ${mode}`)
 }
 
 async function boundary(ctx: Context, agent: Agent): Promise<void> {
@@ -274,11 +280,7 @@ describe('Chat and Agent behavior', () => {
   it('does not change mode when the command input is invalid', async () => {
     const ctx = await setup()
     const agent = await createAgent(ctx, 'invalid')
-    const result = await ctx.commands.execute(
-      agent,
-      '/autonomy turbo',
-      new AbortController().signal,
-    )
+    const result = await executeCommand(ctx, agent, '/autonomy turbo')
     expect(result?.result.kind).toBe('error')
     expect(foldAutonomyMode(agent.session.events)).toBe('agent')
     expect((await executeProbe(ctx, agent)).isError).toBe(false)

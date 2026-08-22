@@ -32,7 +32,7 @@
 
 ## 安装
 
-插件支持 DeepSeek Harness `0.1.0-rc.6`，并已针对 `0.1.0-rc.7` 完成验证。
+插件同时支持 DeepSeek Harness 当前两组 prerelease API：`0.1.0-rc.6+` 与 `0.1.1-rc.1+`；已针对 `0.1.0-rc.6`、`0.1.0-rc.7` 和 `0.1.1-rc.2` 完成验证。Node.js 版本与当前 DSH 保持一致：`^22.19.0` 或 `>=24.0.0`。
 
 先确认 DeepSeek Harness CLI 可用，不要求全局安装：
 

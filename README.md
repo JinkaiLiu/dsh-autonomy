@@ -34,7 +34,7 @@ This can avoid the kind of runaway agent session described in [DeepSeek Harness 
 
 ## Install
 
-The plugin supports DeepSeek Harness `0.1.0-rc.6` and is verified against `0.1.0-rc.7`.
+The plugin supports both active DeepSeek Harness prerelease API families: `0.1.0-rc.6+` and `0.1.1-rc.1+`. It is verified against `0.1.0-rc.6`, `0.1.0-rc.7`, and `0.1.1-rc.2`. Use Node.js `^22.19.0` or `>=24.0.0`, matching current DSH releases.
 
 You need a working DeepSeek Harness CLI. Verify it without requiring a global installation:
 

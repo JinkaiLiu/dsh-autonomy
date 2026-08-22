@@ -56,11 +56,20 @@ interface AutonomyUnitState {
 }
 
 interface AutonomyAttempt {
+  commandId: string
+  mode: AutonomyMode
+}
+
+interface RuntimeSelection {
   commandId: CommandId
   mode: AutonomyMode
 }
 
-interface RuntimeSelection extends AutonomyAttempt {}
+declare module '@deepseek-ai/dsh-session-projection/types' {
+  interface SessionProjectionStateMap {
+    autonomy: AutonomyUnitState
+  }
+}
 
 interface AgentInstrumentation {
   guard: () => void
@@ -70,6 +79,14 @@ interface AgentInstrumentation {
 
 const projectionSchema: ZodType<AutonomyProjection> = z.object({
   mode: z.enum(['chat', 'agent']),
+})
+
+const projectionStateSchema: ZodType<AutonomyUnitState> = z.object({
+  mode: z.enum(['chat', 'agent']),
+  attempts: z.array(z.object({
+    commandId: z.string(),
+    mode: z.enum(['chat', 'agent']),
+  })),
 })
 
 function isMode(value: string): value is AutonomyMode {
@@ -228,11 +245,15 @@ export function apply(ctx: Context, config?: Partial<Config>): void {
   })
 
   ctx.inject(['sessionProjections'], (projectionCtx) => {
-    projectionCtx.sessionProjections.register<'autonomy', AutonomyUnitState>({
+    // DSH 0.1.0 exposes `schema`/`view` directly, while 0.1.1 moves the
+    // durable-state schema to `stateSchema` and the public view under `wire`.
+    // Keeping both shapes makes one package safe across the two API families.
+    const definition = {
       key: 'autonomy',
       schema: projectionSchema,
+      stateSchema: projectionStateSchema,
       init: () => ({ mode: settings.defaultMode, attempts: [] }),
-      apply: (state, event) => {
+      apply: (state: AutonomyUnitState, event: SessionEvent): AutonomyUnitState => {
         if (event.type === 'command/run') {
           const mode = commandMode(event)
           if (mode === undefined) return state
@@ -249,9 +270,14 @@ export function apply(ctx: Context, config?: Partial<Config>): void {
         if (event.data.kind !== 'success') return { ...state, attempts }
         return { mode: attempt.mode, attempts }
       },
-      view: state => ({ mode: state.mode }),
+      view: (state: AutonomyUnitState): AutonomyProjection => ({ mode: state.mode }),
+      wire: {
+        viewSchema: projectionSchema,
+        view: (state: AutonomyUnitState): AutonomyProjection => ({ mode: state.mode }),
+      },
       stateVersion: 2,
-    })
+    } as const
+    projectionCtx.sessionProjections.register(definition)
   })
 
   ctx.inject(['commands'], (commandCtx) => {
