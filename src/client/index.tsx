@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import type { CSSProperties } from 'react'
-import type {} from '@deepseek-ai/dsh-api-remotes/client'
-import type { ClientContext, SessionId } from '@deepseek-ai/dsh-client-runtime/client'
+import type { ClientContext, ISessions, SessionId } from '@deepseek-ai/dsh-client-runtime/client'
 import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
 import type {
   InjectFace,
@@ -10,7 +9,7 @@ import type {
 import type { AutonomyMode } from '../types.ts'
 import type {} from '../client-types.ts'
 
-export const inject = ['slots', 'remote', 'remote.commands']
+export const inject = ['slots', 'sessions']
 
 export interface AutonomyToggleInjected {
   setMode: (mode: AutonomyMode) => Promise<string | null>
@@ -122,7 +121,7 @@ export function AutonomyToggle({ useProjection, setMode }: AutonomyToggleProps) 
               }}
               aria-pressed={active}
               title={mode === 'chat'
-                ? 'Chat: answer only, with no tool use or autonomous actions'
+                ? 'Chat: keep this session context and block further tool calls. An action already in progress is not cancelled; use Stop to end it.'
                 : 'Agent: restore the full DeepSeek Harness agent loop'}
               disabled={submitting !== null}
               onClick={() => { choose(mode) }}
@@ -141,6 +140,9 @@ export function AutonomyToggle({ useProjection, setMode }: AutonomyToggleProps) 
 
 /** Register the toggle on its own right-aligned row above the composer card. */
 export function apply(ctx: ClientContext): void {
+  // The combined host/client declaration build also sees the Host SessionStore
+  // merge. Pin this browser-only access to the public client session face.
+  const sessions = ctx.sessions as unknown as ISessions
   ctx.slots.inject('conversation.input.dock', () => ctx.slots.register({
     name: 'conversation.input.dock',
     id: 'autonomy',
@@ -148,10 +150,11 @@ export function apply(ctx: ClientContext): void {
     label: 'Autonomy',
     inject: (sessionId: SessionId): AutonomyToggleInjected => ({
       setMode: async (mode) => {
-        const result = await ctx.remote.commands.execute(sessionId, `/autonomy ${mode}`)
+        const session = sessions.binding(sessionId)?.session
+        if (session === undefined) return 'session unavailable'
+        const result = await session.command(`/autonomy ${mode}`)
         if (!result.ok) return `${result.error.message} (${result.error.code})`
-        if (result.value === undefined) return 'unknown command: /autonomy'
-        if (result.value.result.kind === 'error') return result.value.result.text
+        if (!result.value.matched) return 'unknown command: /autonomy'
         return null
       },
     }),

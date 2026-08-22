@@ -1,5 +1,7 @@
 # dsh-autonomy
 
+English | [简体中文](README.zh.md)
+
 Switch between **Chat** and **Agent** without leaving your DeepSeek Harness session.
 
 `dsh-autonomy` adds an always-visible `Chat | Agent` control on a dedicated row above the Web composer. It never overlays the text area or consumes space in the composer's tool row. The selection belongs to the current session, survives reloads and resumes, and follows a fork through the durable session log.
@@ -32,7 +34,7 @@ This can avoid the kind of runaway agent session described in [DeepSeek Harness 
 
 ## Install
 
-This release targets DeepSeek Harness `0.1.0-rc.6`.
+The plugin supports both active DeepSeek Harness prerelease API families: `0.1.0-rc.6+` and `0.1.1-rc.1+`. It is verified against `0.1.0-rc.6`, `0.1.0-rc.7`, and `0.1.1-rc.2`. Use Node.js `^22.19.0` or `>=24.0.0`, matching current DSH releases.
 
 You need a working DeepSeek Harness CLI. Verify it without requiring a global installation:
 
@@ -64,6 +66,17 @@ The package declares a DSH bundle, so `dsh plugin` adds both its host behavior a
 
 For a GitHub install, DSH's pnpm profile must allow this package's `prepare` build before retrying the add. A registry release or packed tarball ships built files and needs no install-time build permission.
 
+## Uninstall
+
+Remove the bundle from the same profile where it was installed, then restart DSH Web:
+
+```sh
+npx @deepseek-ai/dsh plugin --profile web remove dsh-autonomy
+npx @deepseek-ai/dsh web
+```
+
+The plugin does not keep a separate database or configuration directory. Historical `/autonomy` command records remain part of the session log, but have no effect after the plugin is removed.
+
 ## Use
 
 Click `Chat` or `Agent` above the composer, or run:
@@ -89,9 +102,31 @@ This is intentionally stronger than a prompt-only "please do not use tools" mode
 
 ## Important boundary
 
-Switching to Chat prevents tool calls that have not passed the execution gate yet. It cannot undo a tool body that already started or roll back an earlier side effect. Use the existing Stop control when you need to cancel an active turn.
+Switching to Chat prevents tool calls that have not passed the execution gate yet. A tool body that is already running is not cancelled by the mode change, and earlier side effects are not rolled back. No action is required if you want that operation to finish; use the existing Stop control only when you want to cancel the active turn.
 
 Chat mode does not weaken or replace DSH sandbox and permission policies. Agent mode restores the composed tool behavior; the existing policies still decide what those tools may do.
+
+## Permissions and data
+
+`dsh-autonomy` runs in the DSH host process, as other trusted Cordis plugins do. It:
+
+- does not make network requests, collect telemetry, or read provider credentials;
+- does not read or write workspace files;
+- records mode changes only through DSH's existing session command log;
+- changes tool visibility and execution policy only for the affected session;
+- sends `/autonomy chat` or `/autonomy agent` from the browser control to the local DSH command service.
+
+Installing any third-party DSH plugin executes its code with the privileges of the DSH process. Review the source and package contents before installing it in an environment that holds sensitive data.
+
+## Troubleshooting
+
+- **The switch is missing:** restart the DSH Web process after installation, confirm that the plugin was added to the `web` profile, then refresh the browser.
+- **`unknown command: /autonomy`:** the Web client loaded but the host bundle did not. Stop every old DSH process and start the same profile again.
+- **The default port is occupied:** stop the older process or start with another port, for example `npx @deepseek-ai/dsh web --port 3081`.
+- **A GitHub-source install asks for build approval:** allow the package's `prepare` script in that profile, or use the prebuilt npm release.
+- **A tool was already running when Chat was selected:** no action is required if you want it to finish. Use Stop only if you want to cancel the active turn; the mode switch cannot roll back an earlier side effect.
+
+When reporting a problem, include the DSH version, plugin version, install command, active profile, operating system, and the first relevant host error.
 
 ## Configuration
 
@@ -118,7 +153,9 @@ pnpm run check
 pnpm run pack:check
 ```
 
-The package contains one DSH host plugin and one browser client bundle. Tests use the real DSH session, command, system-prompt, tool, agent-scope, and execution services; only the Agent object is kept minimal. The release gate also installs the packed tarball into a clean DSH home and verifies Web UI switching plus cold-session recovery.
+The package contains one DSH host plugin and one browser client bundle. Tests use the real DSH session, command, system-prompt, tool, agent-scope, and execution services; only the Agent object is kept minimal.
+
+CI runs type checking, the host and client test suites, a production build, packed-file inspection, and `publint` package validation.
 
 ## Status
 
