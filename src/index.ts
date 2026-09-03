@@ -77,6 +77,18 @@ interface AgentInstrumentation {
   restriction?: () => void
 }
 
+/** Read a complete event snapshot across the rc and 0.1.2 Session APIs. */
+function sessionEvents(session: Session): readonly SessionEvent[] {
+  const compatible = session as Session & {
+    readonly events?: readonly SessionEvent[]
+    snapshotEvents?: () => readonly SessionEvent[]
+  }
+  if (typeof compatible.snapshotEvents === 'function') {
+    return compatible.snapshotEvents()
+  }
+  return compatible.events ?? []
+}
+
 const projectionSchema: ZodType<AutonomyProjection> = z.object({
   mode: z.enum(['chat', 'agent']),
 })
@@ -131,13 +143,16 @@ export function apply(ctx: Context, config?: Partial<Config>): void {
     chatGuidance: config?.chatGuidance ?? DEFAULT_CHAT_GUIDANCE,
     denyMessage: config?.denyMessage ?? DEFAULT_DENY_MESSAGE,
   }
-  const runtimeSelections = new WeakMap<Session, RuntimeSelection>()
+  // The rc client-runtime declarations can contribute their older Session
+  // identity while an alpha host is installed. Object identity is the actual
+  // key contract here and avoids coupling these runtime maps to either shape.
+  const runtimeSelections = new WeakMap<object, RuntimeSelection>()
   const instrumented = new Map<Agent, AgentInstrumentation>()
-  const agentsBySession = new WeakMap<Session, Agent>()
+  const agentsBySession = new WeakMap<object, Agent>()
 
   const effectiveMode = (agent: Agent): AutonomyMode =>
     runtimeSelections.get(agent.session)?.mode
-      ?? foldAutonomyMode(agent.session.events, settings.defaultMode)
+      ?? foldAutonomyMode(sessionEvents(agent.session), settings.defaultMode)
 
   /** Keep inherited schemas aligned with the selected mode. */
   const syncRestriction = (agent: Agent): void => {
