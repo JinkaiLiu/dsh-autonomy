@@ -82,6 +82,9 @@ jobs:
     name: DSH ${{ matrix.dsh-channel }} compatibility
     if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
+    # This job intentionally tests same-day upstream prereleases by exact version.
+    env:
+      PNPM_CONFIG_MINIMUM_RELEASE_AGE: 0
     strategy:
       fail-fast: false
       matrix:
@@ -108,7 +111,7 @@ jobs:
           echo "Testing DSH $DSH_CHANNEL at $dsh_version"
       - name: Install current DSH ${{ matrix.dsh-channel }} API family
         run: |
-          pnpm add --save-dev --ignore-scripts --lockfile=false \
+          pnpm add --save-dev --ignore-scripts \
             @deepseek-ai/cordis@^4.0.2 \
             "@deepseek-ai/dsh-agent@$DSH_VERSION" \
             "@deepseek-ai/dsh-agent-loop@$DSH_VERSION" \
