@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
 import type { CSSProperties } from 'react'
-import type { ClientContext, ISessions, SessionId } from '@deepseek-ai/dsh-client-runtime/client'
 import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
 import type {
   InjectFace,
@@ -13,6 +12,34 @@ export const inject = ['slots', 'sessions']
 
 export interface AutonomyToggleInjected {
   setMode: (mode: AutonomyMode) => Promise<string | null>
+}
+
+type SessionId = string
+
+type CommandResult =
+  | { ok: true; value: { matched: boolean } }
+  | { ok: false; error: { message: string; code: string } }
+
+/** Minimal client surface shared by the rc runtime and alpha Session Controller. */
+export interface AutonomyClientContext {
+  slots: {
+    inject: (name: 'conversation.input.dock', mount: () => unknown) => unknown
+    register: (
+      options: {
+        name: 'conversation.input.dock'
+        id: string
+        order: number
+        label?: string
+        inject: (sessionId: SessionId) => AutonomyToggleInjected
+      },
+      component: typeof AutonomyToggle,
+    ) => unknown
+  }
+  sessions: {
+    binding: (sessionId: SessionId) => {
+      session: { command: (line: string) => Promise<CommandResult> }
+    } | undefined
+  }
 }
 
 export type AutonomyToggleProps =
@@ -139,10 +166,8 @@ export function AutonomyToggle({ useProjection, setMode }: AutonomyToggleProps) 
 }
 
 /** Register the toggle on its own right-aligned row above the composer card. */
-export function apply(ctx: ClientContext): void {
-  // The combined host/client declaration build also sees the Host SessionStore
-  // merge. Pin this browser-only access to the public client session face.
-  const sessions = ctx.sessions as unknown as ISessions
+export function apply(ctx: AutonomyClientContext): void {
+  const sessions = ctx.sessions
   ctx.slots.inject('conversation.input.dock', () => ctx.slots.register({
     name: 'conversation.input.dock',
     id: 'autonomy',

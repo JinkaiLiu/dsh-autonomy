@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest'
-import type { ClientContext, SessionId } from '@deepseek-ai/dsh-client-runtime/client'
-import { apply, type AutonomyToggleInjected } from '../src/client/index.tsx'
+import {
+  apply,
+  type AutonomyClientContext,
+  type AutonomyToggleInjected,
+} from '../src/client/index.tsx'
+
+type SessionId = string
 
 describe('Web client registration', () => {
   it('mounts above the composer and dispatches the session command', async () => {
@@ -36,7 +41,7 @@ describe('Web client registration', () => {
           }
         },
       },
-    } as unknown as ClientContext
+    } as unknown as AutonomyClientContext
 
     apply(ctx)
 
@@ -90,7 +95,7 @@ describe('Web client registration', () => {
           }
         },
       },
-    } as unknown as ClientContext
+    } as unknown as AutonomyClientContext
 
     apply(ctx)
 

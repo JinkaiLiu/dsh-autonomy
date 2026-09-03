@@ -4,6 +4,28 @@ All notable changes to `dsh-autonomy` are documented here.
 
 ## Unreleased
 
+## 0.1.2 - 2026-09-03
+
+### Changed
+
+- Added compatibility with the redesigned DSH `0.1.2` Session API by reading
+  durable events through `snapshotEvents()` while retaining the rc fallback.
+- Removed the Web client's direct dependency on the retired
+  `@deepseek-ai/dsh-client-runtime` package and ordered it through the
+  cross-version Conversation layer instead.
+- Extended the declared peer ranges through DSH `0.1.2-alpha.5` and its later
+  `0.1.2` prereleases.
+
+### Verification
+
+- Verified the complete Host and client test suites against DSH
+  `0.1.2-alpha.5` and `0.1.2-rc.1` in addition to the existing rc baselines.
+- Added scheduled `next` and `alpha` compatibility jobs that resolve the exact
+  root DSH version before installing its API family.
+- Added token-aware Web profile smoke coverage for the new batch plugin route.
+- Verified in a real alpha Web client that Chat and Agent switch successfully
+  and that the selected mode survives a page reload.
+
 ## 0.1.1 - 2026-08-22
 
 This is a compatibility and release-hardening update for both active DeepSeek Harness API families.

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
 import AgentRegistry, { agentEvents, type Agent } from '@deepseek-ai/dsh-agent'
 import CommandRuntime, { CommandId } from '@deepseek-ai/dsh-commands'
-import { CallId, createUserMessage } from '@deepseek-ai/dsh-llm'
+import { createUserMessage, type CallId } from '@deepseek-ai/dsh-llm'
 import SessionStore, {
   Session,
   SessionId,
@@ -26,6 +26,18 @@ const CONFIG: Config = {
 }
 
 const autonomyFibers = new WeakMap<Context, { dispose: () => Promise<void> }>()
+
+function eventsOf(session: Session): readonly SessionEvent[] {
+  const compatible = session as Session & {
+    readonly events?: readonly SessionEvent[]
+    snapshotEvents?: () => readonly SessionEvent[]
+  }
+  return compatible.snapshotEvents?.() ?? compatible.events ?? []
+}
+
+function callId(value: string): CallId {
+  return value as CallId
+}
 
 async function setup(config: Partial<Config> | null = CONFIG): Promise<Context> {
   const ctx = new Context()
@@ -108,7 +120,7 @@ async function assembly(ctx: Context, agent: Agent) {
 
 async function executeProbe(ctx: Context, agent: Agent) {
   return ctx.tools.execute({
-    callId: CallId(`call-${agent.session.events.length}`),
+    callId: callId(`call-${eventsOf(agent.session).length}`),
     name: 'probe',
     arguments: {},
     agent,
@@ -119,16 +131,16 @@ async function executeProbe(ctx: Context, agent: Agent) {
 describe('foldAutonomyMode', () => {
   it('uses the fallback and commits only successfully completed commands', () => {
     const session = Session.create(SessionId('fold'))
-    expect(foldAutonomyMode(session.events)).toBe('agent')
-    expect(foldAutonomyMode(session.events, 'chat')).toBe('chat')
+    expect(foldAutonomyMode(eventsOf(session))).toBe('agent')
+    expect(foldAutonomyMode(eventsOf(session), 'chat')).toBe('chat')
     session.append('command/run', {
       commandId: CommandId('fold-unpaired'), name: 'autonomy', args: ' chat', source: { kind: 'user' },
     })
-    expect(foldAutonomyMode(session.events)).toBe('agent')
+    expect(foldAutonomyMode(eventsOf(session))).toBe('agent')
     session.append('command/done', {
       commandId: CommandId('fold-unpaired'), kind: 'error', text: 'failed',
     })
-    expect(foldAutonomyMode(session.events)).toBe('agent')
+    expect(foldAutonomyMode(eventsOf(session))).toBe('agent')
     session.append('command/run', {
       commandId: CommandId('fold-chat'), name: 'autonomy', args: ' CHAT ', source: { kind: 'user' },
     })
@@ -137,7 +149,7 @@ describe('foldAutonomyMode', () => {
       commandId: CommandId('fold-invalid'), name: 'autonomy', args: ' turbo', source: { kind: 'user' },
     })
     session.append('command/done', { commandId: CommandId('fold-invalid'), kind: 'success' })
-    expect(foldAutonomyMode(session.events)).toBe('chat')
+    expect(foldAutonomyMode(eventsOf(session))).toBe('chat')
   })
 })
 
@@ -155,7 +167,7 @@ describe('Chat and Agent behavior', () => {
 
     const switched = await command(ctx, agent, 'chat')
     expect(switched?.result.kind).toBe('success')
-    expect(foldAutonomyMode(agent.session.events)).toBe('chat')
+    expect(foldAutonomyMode(eventsOf(agent.session))).toBe('chat')
 
     const request = await assembly(ctx, agent)
     expect(request.tools).toEqual([])
@@ -188,8 +200,8 @@ describe('Chat and Agent behavior', () => {
 
     await command(ctx, chatAgent, 'chat')
 
-    expect(foldAutonomyMode(chatAgent.session.events)).toBe('chat')
-    expect(foldAutonomyMode(agentAgent.session.events)).toBe('agent')
+    expect(foldAutonomyMode(eventsOf(chatAgent.session))).toBe('chat')
+    expect(foldAutonomyMode(eventsOf(agentAgent.session))).toBe('agent')
     expect((await assembly(ctx, chatAgent)).tools).toEqual([])
     expect((await assembly(ctx, agentAgent)).tools.map(tool => tool.name)).toEqual(['probe'])
     expect((await executeProbe(ctx, chatAgent)).isError).toBe(true)
@@ -213,10 +225,10 @@ describe('Chat and Agent behavior', () => {
     const restoredAgent = await createAgent(
       restoredCtx,
       'after-restart',
-      originalAgent.session.events,
+      eventsOf(originalAgent.session),
     )
 
-    expect(foldAutonomyMode(restoredAgent.session.events)).toBe('chat')
+    expect(foldAutonomyMode(eventsOf(restoredAgent.session))).toBe('chat')
     expect((await assembly(restoredCtx, restoredAgent)).tools).toEqual([])
     expect((await executeProbe(restoredCtx, restoredAgent)).isError).toBe(true)
   })
@@ -227,14 +239,14 @@ describe('Chat and Agent behavior', () => {
     agent.session.append('turn/start', { turn: 1 })
 
     await command(ctx, agent, 'chat')
-    expect(foldAutonomyMode(agent.session.events)).toBe('chat')
+    expect(foldAutonomyMode(eventsOf(agent.session))).toBe('chat')
 
     // The runtime selection already protects calls from an in-flight response.
     expect((await executeProbe(ctx, agent)).isError).toBe(true)
     expect((await assembly(ctx, agent)).tools).toEqual([])
 
     await boundary(ctx, agent)
-    expect(foldAutonomyMode(agent.session.events)).toBe('chat')
+    expect(foldAutonomyMode(eventsOf(agent.session))).toBe('chat')
   })
 
   it('lets an already-running tool settle while blocking later calls', async () => {
@@ -259,7 +271,7 @@ describe('Chat and Agent behavior', () => {
     const agent = await createAgent(ctx, 'already-running')
 
     const running = ctx.tools.execute({
-      callId: CallId('call-already-running'),
+      callId: callId('call-already-running'),
       name: 'slow-probe',
       arguments: {},
       agent,
@@ -282,7 +294,7 @@ describe('Chat and Agent behavior', () => {
     const agent = await createAgent(ctx, 'invalid')
     const result = await executeCommand(ctx, agent, '/autonomy turbo')
     expect(result?.result.kind).toBe('error')
-    expect(foldAutonomyMode(agent.session.events)).toBe('agent')
+    expect(foldAutonomyMode(eventsOf(agent.session))).toBe('agent')
     expect((await executeProbe(ctx, agent)).isError).toBe(false)
   })
 
@@ -301,7 +313,7 @@ describe('Chat and Agent behavior', () => {
   it('can default new sessions to Chat mode without writing synthetic events', async () => {
     const ctx = await setup({ ...CONFIG, defaultMode: 'chat' })
     const agent = await createAgent(ctx, 'default-chat')
-    expect(agent.session.events).toHaveLength(0)
+    expect(eventsOf(agent.session)).toHaveLength(0)
     expect((await assembly(ctx, agent)).tools).toEqual([])
     expect((await executeProbe(ctx, agent)).isError).toBe(true)
   })

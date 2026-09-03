@@ -34,7 +34,7 @@ This can avoid the kind of runaway agent session described in [DeepSeek Harness 
 
 ## Install
 
-The plugin supports both active DeepSeek Harness prerelease API families: `0.1.0-rc.6+` and `0.1.1-rc.1+`. It is verified against `0.1.0-rc.6`, `0.1.0-rc.7`, and `0.1.1-rc.2`. Use Node.js `^22.19.0` or `>=24.0.0`, matching current DSH releases.
+The published `0.1.1` release supports the DeepSeek Harness `0.1.0-rc.6+` and `0.1.1-rc.1+` API families. The current development line additionally supports the redesigned `0.1.2` family and is verified against `0.1.2-alpha.5` and `0.1.2-rc.1`. Use Node.js `^22.19.0` or `>=24.0.0`, matching current DSH releases.
 
 You need a working DeepSeek Harness CLI. Verify it without requiring a global installation:
 
@@ -155,7 +155,7 @@ pnpm run pack:check
 
 The package contains one DSH host plugin and one browser client bundle. Tests use the real DSH session, command, system-prompt, tool, agent-scope, and execution services; only the Agent object is kept minimal.
 
-CI runs type checking, the host and client test suites, a production build, packed-file inspection, and `publint` package validation.
+CI runs type checking, the host and client test suites, a production build, packed-file inspection, and `publint` package validation. Scheduled compatibility jobs resolve and test the exact versions currently published under both DSH `next` and `alpha`, then boot an isolated authenticated Web profile and fetch the plugin from the generated module route.
 
 ## Status
 
