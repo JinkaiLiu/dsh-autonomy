@@ -4,6 +4,8 @@ All notable changes to `dsh-autonomy` are documented here.
 
 ## Unreleased
 
+## 0.1.2 - 2026-09-03
+
 ### Changed
 
 - Added compatibility with the redesigned DSH `0.1.2` Session API by reading
