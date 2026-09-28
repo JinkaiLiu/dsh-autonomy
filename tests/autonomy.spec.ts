@@ -11,6 +11,7 @@ import SessionStore, {
 } from '@deepseek-ai/dsh-session'
 import { createScope } from '@deepseek-ai/dsh-scope'
 import SystemPrompt from '@deepseek-ai/dsh-system-prompt'
+import SessionProjections from '@deepseek-ai/dsh-session-projection'
 import ToolRuntime, { defineTool } from '@deepseek-ai/dsh-tools'
 import apply, {
   DEFAULT_CHAT_GUIDANCE,
@@ -46,6 +47,7 @@ async function setup(config: Partial<Config> | null = CONFIG): Promise<Context> 
   await ctx.plugin(ToolRuntime)
   await ctx.plugin(AgentRegistry)
   await ctx.plugin(CommandRuntime)
+  await ctx.plugin(SessionProjections)
   const autonomyFiber = config === null
     ? await ctx.plugin(apply)
     : await ctx.plugin(apply, config)
@@ -69,6 +71,10 @@ async function createAgent(
   seed?: readonly SessionEvent[],
 ): Promise<Agent> {
   const session = Session.create(SessionId(id), seed)
+  // Real stores publish session/event; detached sessions cannot drive the
+  // eager projection registry used by the legacy API family.
+  ctx.sessions.enter(session)
+  ctx.sessions.announce(session)
   const agent = {
     id: SessionId(id),
     session,
@@ -154,6 +160,29 @@ describe('foldAutonomyMode', () => {
 })
 
 describe('Chat and Agent behavior', () => {
+  it('publishes only committed modes and restores the Web projection on replay', async () => {
+    const ctx = await setup()
+    const agent = await createAgent(ctx, 'projection')
+    const view = () => ctx.sessionProjections.snapshot(agent.session).values.autonomy
+    expect(view()).toEqual({ mode: 'agent' })
+    await command(ctx, agent, 'chat')
+    expect(view()).toEqual({ mode: 'chat' })
+
+    const commandId = CommandId('failed-projection-switch')
+    agent.session.append('command/run', {
+      commandId, name: 'autonomy', args: 'agent', source: { kind: 'user' },
+    })
+    expect(view()).toEqual({ mode: 'chat' })
+    agent.session.append('command/done', { commandId, kind: 'error', text: 'failed' })
+    expect(view()).toEqual({ mode: 'chat' })
+
+    const restored = await createAgent(ctx, 'projection-replay', eventsOf(agent.session))
+    expect(ctx.sessionProjections.snapshot(restored.session).values.autonomy).toEqual({ mode: 'chat' })
+    await command(ctx, agent, 'agent')
+    expect(view()).toEqual({ mode: 'agent' })
+    expect(ctx.sessionProjections.snapshot(restored.session).values.autonomy).toEqual({ mode: 'chat' })
+  })
+
   it('starts with safe defaults when the profile omits config entirely', async () => {
     const ctx = await setup(null)
     const agent = await createAgent(ctx, 'zero-config')

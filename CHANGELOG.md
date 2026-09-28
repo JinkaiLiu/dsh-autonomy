@@ -2,7 +2,35 @@
 
 All notable changes to `dsh-autonomy` are documented here.
 
-## Unreleased
+## 0.1.3 - 2026-09-28
+
+### Changed
+
+- Move the development baseline to DSH `0.1.7-rc.2` and declare compatibility
+  with the `0.1.7-alpha.2` API family while retaining legacy API checks.
+- Update Cordis, Schemastery, Zod, TypeScript, Vitest, and tsdown; deduplicate
+  Zod to avoid incompatible recursive schema types during declaration builds.
+- Express the Web toggle's consumed slot props directly so its declaration
+  does not depend on transitive client type augmentations removed upstream.
+
+### Fixed
+
+- Resolve compatibility dependencies from the selected release's published
+  manifests, including exact peer overrides, instead of installing retired
+  packages such as `dsh-code-runtime` from a hard-coded list.
+- Move the full Web smoke test to the current DSH release; the old
+  `0.1.1-rc.2` CLI fails at startup with a missing Cordis HMR service.
+- Resolve relative client bundle URLs against the Web origin, fixing malformed
+  URLs after the upstream route format changed.
+- Share authenticated install, Web boot, bundle fetch, and uninstall checks
+  between the pinned package job and the scheduled channel jobs.
+
+### Verification
+
+- Check pinned legacy versions and `0.1.7-alpha.2` on every push and PR;
+  monitor the exact versions behind `latest`, `next`, and `alpha` weekly.
+- Add a real session-projection regression test covering committed mode
+  changes, failed commands, replay, and session isolation.
 
 ## 0.1.2 - 2026-09-03
 

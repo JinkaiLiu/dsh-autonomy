@@ -11,7 +11,7 @@ Thanks for taking the time to improve `dsh-autonomy`.
 
 ## Local setup
 
-This project requires Node.js 22 or newer and pnpm 11.7.0.
+This project requires Node.js `^22.19.0 || >=24.0.0` and pnpm 11.7.0.
 
 ```sh
 pnpm install
@@ -20,6 +20,25 @@ pnpm run pack:check
 ```
 
 `pnpm run check` runs type checking, tests, and a production build. `pack:check` verifies the files that would be included in the npm package.
+
+## Compatibility checks
+
+The frozen lockfile uses DSH `0.1.7-rc.2`. CI also tests the older supported
+API families and the pinned alpha release. Scheduled checks resolve the current
+`latest`, `next`, and `alpha` tags.
+
+In a disposable copy of the repository, run:
+
+```sh
+node scripts/install-dsh.mjs 0.1.7-alpha.2
+pnpm run check
+DSH_VERSION=0.1.7-alpha.2 bash scripts/smoke-web.sh
+```
+
+The installer rewrites `package.json`, `pnpm-workspace.yaml`, and the lockfile
+for that API family. Do not commit those temporary matrix changes. The Web smoke
+script uses a temporary DSH home, disables telemetry, loads the authenticated
+client bundle, and verifies uninstall. Set `DSH_PORT` if port 3198 is occupied.
 
 ## Tests
 
