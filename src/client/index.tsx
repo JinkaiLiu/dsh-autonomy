@@ -1,11 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import type { CSSProperties } from 'react'
-import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
-import type {
-  InjectFace,
-  PropsRuntime,
-} from '@deepseek-ai/dsh-client-ui-slots'
-import type { AutonomyMode } from '../types.ts'
+import type { AutonomyMode, AutonomyProjection } from '../types.ts'
 import type {} from '../client-types.ts'
 
 export const inject = ['slots', 'sessions']
@@ -42,8 +37,10 @@ export interface AutonomyClientContext {
   }
 }
 
-export type AutonomyToggleProps =
-  PropsRuntime<'conversation.input.dock'> & InjectFace<AutonomyToggleInjected>
+/** Stable slot surface shared by the legacy runtime and current Session Controller. */
+export interface AutonomyToggleProps extends AutonomyToggleInjected {
+  useProjection: (key: 'autonomy') => AutonomyProjection | undefined
+}
 
 const styles: Record<string, CSSProperties> = {
   dock: {

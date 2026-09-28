@@ -44,166 +44,53 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        dsh-version:
-          - 0.1.0-rc.6
-          - 0.1.0-rc.7
-          - 0.1.1-rc.2
+        dsh-version: [0.1.0-rc.6, 0.1.0-rc.7, 0.1.1-rc.2, 0.1.2-rc.1, 0.1.7-alpha.2]
     steps:
       - uses: actions/checkout@v7
       - uses: pnpm/action-setup@v6
-        with:
-          version: 11.7.0
       - uses: actions/setup-node@v7
         with:
-          node-version: 22.19.0
+          node-version: 24
           cache: pnpm
-      - run: pnpm install --frozen-lockfile --ignore-scripts
-      - name: Install DSH ${{ matrix.dsh-version }} API family
+      - name: Install exact DSH API family
         env:
           DSH_VERSION: ${{ matrix.dsh-version }}
-        run: |
-          pnpm add --save-dev --ignore-scripts --lockfile=false \
-            "@deepseek-ai/dsh-agent@$DSH_VERSION" \
-            "@deepseek-ai/dsh-agent-loop@$DSH_VERSION" \
-            "@deepseek-ai/dsh-api-remotes@$DSH_VERSION" \
-            "@deepseek-ai/dsh-client-runtime@$DSH_VERSION" \
-            "@deepseek-ai/dsh-client-ui-conversation@$DSH_VERSION" \
-            "@deepseek-ai/dsh-client-ui-slots@$DSH_VERSION" \
-            "@deepseek-ai/dsh-commands@$DSH_VERSION" \
-            "@deepseek-ai/dsh-llm@$DSH_VERSION" \
-            "@deepseek-ai/dsh-session@$DSH_VERSION" \
-            "@deepseek-ai/dsh-session-projection@$DSH_VERSION" \
-            "@deepseek-ai/dsh-scope@$DSH_VERSION" \
-            "@deepseek-ai/dsh-system-prompt@$DSH_VERSION" \
-            "@deepseek-ai/dsh-tools@$DSH_VERSION"
+        run: node scripts/install-dsh.mjs "$DSH_VERSION"
       - run: pnpm run check
 
   upstream-prerelease:
     name: DSH ${{ matrix.dsh-channel }} compatibility
     if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
-    # This job intentionally tests same-day upstream prereleases by exact version.
     env:
       PNPM_CONFIG_MINIMUM_RELEASE_AGE: 0
     strategy:
       fail-fast: false
       matrix:
-        dsh-channel:
-          - next
-          - alpha
+        dsh-channel: [latest, next, alpha]
     steps:
       - uses: actions/checkout@v7
       - uses: pnpm/action-setup@v6
-        with:
-          version: 11.7.0
       - uses: actions/setup-node@v7
         with:
           node-version: 24
           cache: pnpm
-      - run: pnpm install --frozen-lockfile --ignore-scripts
-      - name: Resolve current DSH ${{ matrix.dsh-channel }} version
+      - name: Resolve and install current DSH API family
         env:
           DSH_CHANNEL: ${{ matrix.dsh-channel }}
-        run: |
-          dsh_version=$(npm view "@deepseek-ai/dsh@$DSH_CHANNEL" version)
-          test -n "$dsh_version"
-          echo "DSH_VERSION=$dsh_version" >> "$GITHUB_ENV"
-          echo "Testing DSH $DSH_CHANNEL at $dsh_version"
-      - name: Install current DSH ${{ matrix.dsh-channel }} API family
-        run: |
-          pnpm add --save-dev --ignore-scripts \
-            @deepseek-ai/cordis@^4.0.2 \
-            "@deepseek-ai/dsh-agent@$DSH_VERSION" \
-            "@deepseek-ai/dsh-agent-loop@$DSH_VERSION" \
-            "@deepseek-ai/dsh-attachment@$DSH_VERSION" \
-            "@deepseek-ai/dsh-code-runtime@$DSH_VERSION" \
-            "@deepseek-ai/dsh-client-ui-conversation@$DSH_VERSION" \
-            "@deepseek-ai/dsh-client-ui-session@$DSH_VERSION" \
-            "@deepseek-ai/dsh-client-ui-slots@$DSH_VERSION" \
-            "@deepseek-ai/dsh-commands@$DSH_VERSION" \
-            "@deepseek-ai/dsh-invariants@$DSH_VERSION" \
-            "@deepseek-ai/dsh-llm@$DSH_VERSION" \
-            "@deepseek-ai/dsh-session@$DSH_VERSION" \
-            "@deepseek-ai/dsh-session-persistence@$DSH_VERSION" \
-            "@deepseek-ai/dsh-session-projection@$DSH_VERSION" \
-            "@deepseek-ai/dsh-settings@$DSH_VERSION" \
-            "@deepseek-ai/dsh-scope@$DSH_VERSION" \
-            "@deepseek-ai/dsh-system-prompt@$DSH_VERSION" \
-            "@deepseek-ai/dsh-tools@$DSH_VERSION" \
-            "@deepseek-ai/dsh-user-approval@$DSH_VERSION"
+        run: node scripts/install-dsh.mjs "$DSH_CHANNEL"
       - run: pnpm run check
-      - name: Pack and boot DSH ${{ matrix.dsh-channel }} Web
-        shell: bash
-        env:
-          DSH_CHANNEL: ${{ matrix.dsh-channel }}
-          DSH_HOME: ${{ runner.temp }}/dsh-autonomy-${{ matrix.dsh-channel }}-home
-          DSH_TELEMETRY_MODE: DISABLED
-        run: |
-          pack_dir="$RUNNER_TEMP/dsh-autonomy-$DSH_CHANNEL-pack"
-          mkdir -p "$pack_dir"
-          pnpm pack --pack-destination "$pack_dir"
-          package_version=$(node -p "require('./package.json').version")
-          pnpm dlx "@deepseek-ai/dsh@$DSH_VERSION" plugin --profile web add \
-            "$pack_dir/dsh-autonomy-$package_version.tgz"
-          pnpm dlx "@deepseek-ai/dsh@$DSH_VERSION" --profile web --dump-config \
-            > "$RUNNER_TEMP/dsh-autonomy-$DSH_CHANNEL-config.txt"
-          grep -q 'name: dsh-autonomy' \
-            "$RUNNER_TEMP/dsh-autonomy-$DSH_CHANNEL-config.txt"
-
-          log="$RUNNER_TEMP/dsh-autonomy-$DSH_CHANNEL-web.log"
-          index="$RUNNER_TEMP/dsh-autonomy-$DSH_CHANNEL-index.html"
-          cookies="$RUNNER_TEMP/dsh-autonomy-$DSH_CHANNEL-cookies.txt"
-          bundle="$RUNNER_TEMP/dsh-autonomy-$DSH_CHANNEL-client.js"
-          pnpm dlx "@deepseek-ai/dsh@$DSH_VERSION" web --no-open --port 3198 \
-            > "$log" 2>&1 &
-          dsh_pid=$!
-          cleanup() {
-            kill "$dsh_pid" 2>/dev/null || true
-            wait "$dsh_pid" 2>/dev/null || true
-          }
-          trap cleanup EXIT
-
-          launch_url=''
-          for attempt in {1..90}; do
-            launch_url=$(grep -Eo 'https?://[^[:space:]]+' "$log" | head -1 || true)
-            if [ -n "$launch_url" ]; then
-              break
-            fi
-            if ! kill -0 "$dsh_pid" 2>/dev/null; then
-              sed -E 's/(token=)[^&[:space:]]+/\1[redacted]/g' "$log"
-              exit 1
-            fi
-            sleep 1
-          done
-          if [ -z "$launch_url" ]; then
-            sed -E 's/(token=)[^&[:space:]]+/\1[redacted]/g' "$log"
-            exit 1
-          fi
-
-          curl --fail --silent --show-error --location \
-            --cookie-jar "$cookies" --cookie "$cookies" \
-            "$launch_url" > "$index"
-          grep -q '"id":"dsh-autonomy"' "$index"
-          plugin_url=$(node - "$index" <<'NODE'
-          const fs = require('fs')
-          const html = fs.readFileSync(process.argv[2], 'utf8')
-          const match = html.match(/"id":"dsh-autonomy","url":"((?:\\.|[^"])*)"/)
-          if (match === null) process.exit(1)
-          process.stdout.write(JSON.parse(`"${match[1]}"`))
-          NODE
-          )
-          curl --fail --silent --show-error \
-            --cookie "$cookies" "http://127.0.0.1:3198$plugin_url" > "$bundle"
-          grep -q 'id: "dsh-autonomy"' "$bundle"
+      - name: Install, boot, and uninstall isolated Web profile
+        run: bash scripts/smoke-web.sh
 
   package:
     name: Package and profile smoke
     runs-on: ubuntu-latest
+    env:
+      DSH_VERSION: 0.1.7-rc.2
     steps:
       - uses: actions/checkout@v7
       - uses: pnpm/action-setup@v6
-        with:
-          version: 11.7.0
       - uses: actions/setup-node@v7
         with:
           node-version: 22
@@ -211,54 +98,5 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm run pack:check
       - run: pnpm dlx publint@0.3.23
-      - name: Pack and install into an isolated DSH profile
-        env:
-          DSH_HOME: ${{ runner.temp }}/dsh-autonomy-home
-        run: |
-          mkdir -p "$RUNNER_TEMP/dsh-autonomy-pack"
-          pnpm pack --pack-destination "$RUNNER_TEMP/dsh-autonomy-pack"
-          package_version=$(node -p "require('./package.json').version")
-          pnpm dlx @deepseek-ai/dsh@0.1.1-rc.2 plugin --profile web add \
-            "$RUNNER_TEMP/dsh-autonomy-pack/dsh-autonomy-$package_version.tgz"
-          pnpm dlx @deepseek-ai/dsh@0.1.1-rc.2 --profile web --dump-config \
-            > "$RUNNER_TEMP/dsh-autonomy-config.txt"
-          grep -q 'name: dsh-autonomy' "$RUNNER_TEMP/dsh-autonomy-config.txt"
-      - name: Boot Web and serve the client bundle
-        shell: bash
-        env:
-          DSH_HOME: ${{ runner.temp }}/dsh-autonomy-home
-        run: |
-          log="$RUNNER_TEMP/dsh-autonomy-web.log"
-          index="$RUNNER_TEMP/dsh-autonomy-index.html"
-          bundle="$RUNNER_TEMP/dsh-autonomy-client.js"
-          pnpm dlx @deepseek-ai/dsh@0.1.1-rc.2 web --no-open --port 3197 > "$log" 2>&1 &
-          dsh_pid=$!
-          cleanup() {
-            kill "$dsh_pid" 2>/dev/null || true
-            wait "$dsh_pid" 2>/dev/null || true
-          }
-          trap cleanup EXIT
-          for attempt in {1..90}; do
-            if curl --fail --silent http://127.0.0.1:3197/ > "$index"; then
-              break
-            fi
-            if ! kill -0 "$dsh_pid" 2>/dev/null; then
-              cat "$log"
-              exit 1
-            fi
-            sleep 1
-          done
-          grep -q '"id":"dsh-autonomy"' "$index"
-          curl --fail --silent http://127.0.0.1:3197/plugins/dsh-autonomy/client.js \
-            > "$bundle"
-          grep -q 'id: "dsh-autonomy"' "$bundle"
-      - name: Uninstall cleanly from the isolated profile
-        env:
-          DSH_HOME: ${{ runner.temp }}/dsh-autonomy-home
-        run: |
-          pnpm dlx @deepseek-ai/dsh@0.1.1-rc.2 plugin --profile web remove dsh-autonomy
-          pnpm dlx @deepseek-ai/dsh@0.1.1-rc.2 --profile web --dump-config \
-            > "$RUNNER_TEMP/dsh-autonomy-config-after-remove.txt"
-          if grep -q 'dsh-autonomy' "$RUNNER_TEMP/dsh-autonomy-config-after-remove.txt"; then
-            exit 1
-          fi
+      - name: Install, boot, and uninstall isolated Web profile
+        run: bash scripts/smoke-web.sh

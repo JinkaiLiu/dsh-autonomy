@@ -32,7 +32,7 @@
 
 ## 安装
 
-已发布的 `0.1.1` 支持 DeepSeek Harness `0.1.0-rc.6+` 与 `0.1.1-rc.1+` 两组 API。当前开发分支已进一步适配重新设计的 `0.1.2` 系列，并针对 `0.1.2-alpha.5` 和 `0.1.2-rc.1` 完成验证。Node.js 版本与当前 DSH 保持一致：`^22.19.0` 或 `>=24.0.0`。
+`dsh-autonomy 0.1.3` 以 DSH `0.1.7-rc.2` 为开发基线，并验证 `0.1.7-alpha.2`。兼容检查仍覆盖 `0.1.0-rc.6`、`0.1.0-rc.7`、`0.1.1-rc.2` 和 `0.1.2-rc.1`。Node.js 版本要求为 `^22.19.0` 或 `>=24.0.0`。
 
 先确认 DeepSeek Harness CLI 可用，不要求全局安装：
 
@@ -151,7 +151,7 @@ pnpm run pack:check
 
 本包包含一个 DSH Host 插件和一个浏览器客户端 bundle。测试使用真实的 DSH session、command、system-prompt、tool、agent-scope 与 execution 服务，仅对 Agent 对象使用最小替身。
 
-CI 会执行类型检查、Host 与客户端测试、生产构建、打包文件检查和 `publint` 包验证。定时兼容任务会分别解析 DSH `next` 与 `alpha` 当前指向的精确版本，运行完整检查，然后启动隔离且带鉴权的 Web profile，并从生成的模块地址获取插件 bundle。
+CI 会执行类型检查、Host 与客户端测试、生产构建、打包文件检查和 `publint` 包验证。定时兼容任务会分别解析 DSH `latest`、`next` 与 `alpha` 当前指向的精确版本，运行完整检查，然后启动隔离且带鉴权的 Web profile，并从生成的模块地址获取插件 bundle。
 
 ## 状态
 
