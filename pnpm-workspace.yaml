@@ -1,4 +1,4 @@
 # Keep upstream prerelease peers on the API family used for development.
 overrides:
-  '@deepseek-ai/dsh-sandbox': 0.1.7-rc.2
-  '@deepseek-ai/dsh-sandbox-policy': 0.1.7-rc.2
+  '@deepseek-ai/dsh-sandbox': 0.2.0-rc.2
+  '@deepseek-ai/dsh-sandbox-policy': 0.2.0-rc.2

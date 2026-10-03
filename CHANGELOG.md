@@ -2,6 +2,23 @@
 
 All notable changes to `dsh-autonomy` are documented here.
 
+## 0.1.4 - 2026-10-03
+
+### Changed
+
+- Move the development baseline and pinned Web smoke test to DSH `0.2.0-rc.2`.
+- Declare peer compatibility with DSH `0.2.0-rc.2` and `0.2.1-alpha.1`, and
+  the Cordis `4.0.5-alpha.1` family used by the current alpha release.
+- Add pinned checks for DSH `0.1.7-rc.2` and `0.2.1-alpha.1` while retaining
+  the existing legacy and scheduled channel checks.
+
+### Verified
+
+- Type checking, all 15 tests, and production builds pass with DSH
+  `0.2.0-rc.2` and `0.2.1-alpha.1`.
+- Both releases load the plugin in an isolated Web profile, switch between
+  Chat and Agent, and retain the selected mode after a page refresh.
+
 ## 0.1.3 - 2026-09-28
 
 ### Changed

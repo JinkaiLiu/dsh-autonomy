@@ -34,7 +34,7 @@ This can avoid the kind of runaway agent session described in [DeepSeek Harness 
 
 ## Install
 
-`dsh-autonomy 0.1.3` uses DSH `0.1.7-rc.2` as the development baseline and verified support for `0.1.7-alpha.2`. Compatibility checks also cover `0.1.0-rc.6`, `0.1.0-rc.7`, `0.1.1-rc.2`, and `0.1.2-rc.1`. Use Node.js `^22.19.0` or `>=24.0.0`.
+`dsh-autonomy 0.1.4` uses DSH `0.2.0-rc.2` as the development baseline and supports `0.2.1-alpha.1`. Compatibility checks also cover `0.1.0-rc.6`, `0.1.0-rc.7`, `0.1.1-rc.2`, `0.1.2-rc.1`, `0.1.7-alpha.2`, and `0.1.7-rc.2`. Use Node.js `^22.19.0` or `>=24.0.0`.
 
 You need a working DeepSeek Harness CLI. Verify it without requiring a global installation:
 
