@@ -23,16 +23,16 @@ pnpm run pack:check
 
 ## Compatibility checks
 
-The frozen lockfile uses DSH `0.1.7-rc.2`. CI also tests the older supported
+The frozen lockfile uses DSH `0.2.0-rc.2`. CI also tests the older supported
 API families and the pinned alpha release. Scheduled checks resolve the current
 `latest`, `next`, and `alpha` tags.
 
 In a disposable copy of the repository, run:
 
 ```sh
-node scripts/install-dsh.mjs 0.1.7-alpha.2
+node scripts/install-dsh.mjs 0.2.1-alpha.1
 pnpm run check
-DSH_VERSION=0.1.7-alpha.2 bash scripts/smoke-web.sh
+DSH_VERSION=0.2.1-alpha.1 bash scripts/smoke-web.sh
 ```
 
 The installer rewrites `package.json`, `pnpm-workspace.yaml`, and the lockfile
