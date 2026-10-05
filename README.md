@@ -1,151 +1,138 @@
 # dsh-autonomy
 
+[![npm version](https://img.shields.io/npm/v/dsh-autonomy)](https://www.npmjs.com/package/dsh-autonomy)
+[![CI](https://github.com/JinkaiLiu/dsh-autonomy/actions/workflows/ci.yml/badge.svg)](https://github.com/JinkaiLiu/dsh-autonomy/actions/workflows/ci.yml)
+
 English | [简体中文](README.zh.md)
 
-Switch between **Chat** and **Agent** without leaving your DeepSeek Harness session.
+**Switch between Chat and Agent in the same DeepSeek Harness session.**
 
-`dsh-autonomy` adds an always-visible `Chat | Agent` control on a dedicated row above the Web composer. It never overlays the text area or consumes space in the composer's tool row. The selection belongs to the current session, survives reloads and resumes, and follows a fork through the durable session log.
+`dsh-autonomy` is a [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) plugin that adds a **Chat | Agent** switch above the Web input. Discuss an approach in Chat, switch to Agent when you're ready to execute, and keep the conversation going.
 
-## Why
+| Mode | Use it for | Behavior |
+| --- | --- | --- |
+| **Chat** | Questions, explanations, planning | Answers in text. Tools are hidden from the model and tool execution is blocked. |
+| **Agent** | Investigation, file edits, commands | Uses DSH's normal tools and agent loop, subject to its existing permissions. |
 
-Sometimes you want the harness to investigate, edit files, run commands, and keep going. Sometimes you only want a concise answer while you stay in control.
+[Quick start](#quick-start) · [Configuration](#configuration) · [Compatibility](#compatibility) · [Troubleshooting](#troubleshooting)
 
-Changing agent presets does not solve that mid-session. `dsh-autonomy` changes the current session's autonomy without replacing its model, preset, history, sandbox, or permission policy.
+## Quick start
 
-The plugin was built in response to [DeepSeek Harness Discussion #1644](https://github.com/deepseek-ai/deepseek-harness/discussions/1644).
-
-## Token control, not a token cap
-
-Chat mode can reduce accidental token spend when you only need an answer, explanation, or tightly guided collaboration.
-
-It does this in two ways:
-
-- Tool schemas are removed from the model request.
-- Autonomous tool loops and follow-up execution steps are prevented.
-
-This can avoid the kind of runaway agent session described in [DeepSeek Harness Discussion #1644](https://github.com/deepseek-ai/deepseek-harness/discussions/1644).
-
-`dsh-autonomy` is not a token budget manager or a hard usage limit. Conversation history, prompt size, model output, and provider pricing still determine the final cost. It gives you direct control over when agentic execution is allowed.
-
-| Mode | Model sees tools | Tool execution | Typical turn |
-| --- | --- | --- | --- |
-| **Chat** | No | Denied | One text response |
-| **Agent** | Original DSH tool set | Original DSH policy | Normal agent loop |
-
-## Install
-
-`dsh-autonomy 0.1.4` uses DSH `0.2.0-rc.2` as the development baseline and supports `0.2.1-alpha.1`. Compatibility checks also cover `0.1.0-rc.6`, `0.1.0-rc.7`, `0.1.1-rc.2`, `0.1.2-rc.1`, `0.1.7-alpha.2`, and `0.1.7-rc.2`. Use Node.js `^22.19.0` or `>=24.0.0`.
-
-You need a working DeepSeek Harness CLI. Verify it without requiring a global installation:
-
-```sh
-npx @deepseek-ai/dsh --version
-```
-
-If your existing Harness setup does not provide a global `dsh` command, keep using the `npx @deepseek-ai/dsh` form shown below. It invokes the official CLI directly, so a separate global `dsh` installation is not required.
-
-From npm:
+You need a working DeepSeek Harness setup and Node.js `^22.19.0 || >=24.0.0`. Install the plugin into the Web profile, then start DSH Web:
 
 ```sh
 npx @deepseek-ai/dsh plugin --profile web add dsh-autonomy
 npx @deepseek-ai/dsh web
 ```
 
-If DSH Web was already running during installation, stop it with `Ctrl+C` and start it again. An existing process does not hot-load newly installed plugins. If the default port is already occupied, stop the old DSH process or test on another port with `npx @deepseek-ai/dsh web --port 3081`.
+These commands use the official CLI through `npx`; a global `dsh` installation is optional. The install command adds both the host plugin and its Web control to the profile.
 
-From a local checkout:
+If DSH Web is already running, stop it with `Ctrl+C` and start it again so it can load the plugin.
 
-```sh
-pnpm install
-pnpm run build
-npx @deepseek-ai/dsh plugin --profile web add /absolute/path/to/dsh-autonomy
-npx @deepseek-ai/dsh web
-```
-
-The package declares a DSH bundle, so `dsh plugin` adds both its host behavior and Web client control to the selected profile.
-
-For a GitHub install, DSH's pnpm profile must allow this package's `prepare` build before retrying the add. A registry release or packed tarball ships built files and needs no install-time build permission.
-
-## Uninstall
-
-Remove the bundle from the same profile where it was installed, then restart DSH Web:
-
-```sh
-npx @deepseek-ai/dsh plugin --profile web remove dsh-autonomy
-npx @deepseek-ai/dsh web
-```
-
-The plugin does not keep a separate database or configuration directory. Historical `/autonomy` command records remain part of the session log, but have no effect after the plugin is removed.
-
-## Use
-
-Click `Chat` or `Agent` above the composer, or run:
+Open a session and click **Chat** or **Agent** above the input. You can also use slash commands:
 
 ```text
 /autonomy chat
 /autonomy agent
 ```
 
-Every valid switch is recorded immediately through DSH's built-in command log, including during an open turn. That same record drives the UI, survives reloads, and changes the policy gates without waiting for another model step.
+The default mode is **Agent**. Each session remembers its own selection across page refreshes, DSH restarts, and session resumes. A fork inherits the mode recorded in its session history. Switching keeps your model, preset, conversation history, and unsent draft.
 
-## What Chat mode enforces
+You can switch during an active turn. The change applies immediately to tool calls that have not passed the execution check.
 
-Chat mode uses three aligned layers:
+> **Already-running operations:** selecting Chat lets a tool that has already started finish; it cannot undo earlier changes. Use DSH's **Stop** control if you want to cancel the active turn.
 
-1. It restricts the agent's inherited tool surface.
-2. It removes every remaining tool schema from the final model request, including the reserved Code Mode transport.
-3. It guards execution in case a provider emits a remembered or otherwise unadvertised tool call.
+<details>
+<summary>Install from a local checkout</summary>
 
-It also adds a short system instruction telling the model to answer directly and ask the user to switch to Agent when action is required.
+Requires pnpm `11.7.0`. Replace `/absolute/path/to/dsh-autonomy` with the path to your cloned directory.
 
-This is intentionally stronger than a prompt-only "please do not use tools" mode. It is also more reliable than rejecting step two: a model can request a tool in its first response, so step-count limiting alone does not create Chat mode.
+```sh
+git clone https://github.com/JinkaiLiu/dsh-autonomy.git
+cd dsh-autonomy
+pnpm install
+pnpm run build
+npx @deepseek-ai/dsh plugin --profile web add /absolute/path/to/dsh-autonomy
+npx @deepseek-ai/dsh web
+```
 
-## Important boundary
+</details>
 
-Switching to Chat prevents tool calls that have not passed the execution gate yet. A tool body that is already running is not cancelled by the mode change, and earlier side effects are not rolled back. No action is required if you want that operation to finish; use the existing Stop control only when you want to cancel the active turn.
+## How it works
 
-Chat mode does not weaken or replace DSH sandbox and permission policies. Agent mode restores the composed tool behavior; the existing policies still decide what those tools may do.
+Chat mode restricts the session's tools, removes all tool definitions from the final model request—including DSH's reserved Code Mode tool—and rejects tool calls at execution time. A short system instruction asks the model to answer directly and suggest switching to Agent when a task requires action.
 
-## Permissions and data
+Agent mode restores DSH's usual tool access and agent loop. DSH's sandbox and permission policies continue to apply in both modes.
 
-`dsh-autonomy` runs in the DSH host process, as other trusted Cordis plugins do. It:
+Every successful switch is saved through DSH's built-in session command log. The Web control and host behavior use that same record to recover the selected mode.
 
-- does not make network requests, collect telemetry, or read provider credentials;
-- does not read or write workspace files;
-- records mode changes only through DSH's existing session command log;
-- changes tool visibility and execution policy only for the affected session;
-- sends `/autonomy chat` or `/autonomy agent` from the browser control to the local DSH command service.
-
-Installing any third-party DSH plugin executes its code with the privileges of the DSH process. Review the source and package contents before installing it in an environment that holds sensitive data.
-
-## Troubleshooting
-
-- **The switch is missing:** restart the DSH Web process after installation, confirm that the plugin was added to the `web` profile, then refresh the browser.
-- **`unknown command: /autonomy`:** the Web client loaded but the host bundle did not. Stop every old DSH process and start the same profile again.
-- **The default port is occupied:** stop the older process or start with another port, for example `npx @deepseek-ai/dsh web --port 3081`.
-- **A GitHub-source install asks for build approval:** allow the package's `prepare` script in that profile, or use the prebuilt npm release.
-- **A tool was already running when Chat was selected:** no action is required if you want it to finish. Use Stop only if you want to cancel the active turn; the mode switch cannot roll back an earlier side effect.
-
-When reporting a problem, include the DSH version, plugin version, install command, active profile, operating system, and the first relevant host error.
+Chat can reduce token use by omitting tool definitions and avoiding autonomous tool loops. It does not impose a token budget or usage cap: conversation history, prompt size, model output, and provider pricing still affect the cost.
 
 ## Configuration
 
-Override the installed row in the profile's `cordis.patch.yml`:
+No configuration is needed. To start sessions in Chat mode when they have no saved selection, update the installed `autonomy` entry in your Web profile's `cordis.patch.yml`:
 
 ```yaml
 - id: autonomy
   config:
-    defaultMode: agent
-    chatGuidance: >-
-      You are in Chat mode. Answer directly in text. Do not use tools or take actions.
-      Ask the user to switch to Agent mode when the request requires execution.
-    denyMessage: >-
-      Chat mode does not allow tool execution. Switch to Agent mode to use tools.
+    defaultMode: chat
 ```
 
-Defaults are `defaultMode: agent` and the guidance shown above in equivalent wording.
+| Option | Default | Purpose |
+| --- | --- | --- |
+| `defaultMode` | `agent` | Mode used when the session has no saved selection. Accepts `chat` or `agent`. |
+| `chatGuidance` | Built-in Chat instruction | System instruction added in Chat mode. |
+| `denyMessage` | Built-in tool denial message | Error returned when a tool call is blocked in Chat mode. |
 
-## Development
+Changing `defaultMode` keeps existing sessions' saved selections. Customizing the messages does not change the tool restrictions.
+
+## Compatibility
+
+For `dsh-autonomy 0.1.4`, the development baseline is DSH `0.2.0-rc.2`; DSH `0.2.1-alpha.1` is also supported. See the [changelog](CHANGELOG.md) for release verification.
+
+<details>
+<summary>Earlier DSH releases covered by CI</summary>
+
+- `0.1.0-rc.6` and `0.1.0-rc.7`
+- `0.1.1-rc.2`
+- `0.1.2-rc.1`
+- `0.1.7-alpha.2` and `0.1.7-rc.2`
+
+</details>
+
+Scheduled CI also checks the exact versions published under DSH's `latest`, `next`, and `alpha` tags. This plugin is an MVP for DSH's developer preview; upstream changes may require plugin updates.
+
+## Troubleshooting
+
+| Symptom | What to check |
+| --- | --- |
+| The switch is missing | Confirm you installed into the `web` profile, restart DSH Web, then refresh the browser. |
+| `unknown command: /autonomy` | The browser control loaded but the host plugin did not. Stop old DSH processes and restart the same profile. |
+| The default port is occupied | Stop the older process or use `npx @deepseek-ai/dsh web --port 3081`. |
+| A GitHub-source install asks for build approval | Allow the package's `prepare` script in that profile, or install the prebuilt npm release. |
+
+If the issue persists, [open an issue](https://github.com/JinkaiLiu/dsh-autonomy/issues) with the DSH and plugin versions, install command, active profile, operating system, and first relevant host error. For security reports, follow [SECURITY.md](SECURITY.md).
+
+## Uninstall
+
+Remove the plugin from the profile where you installed it, then restart DSH Web:
+
+```sh
+npx @deepseek-ai/dsh plugin --profile web remove dsh-autonomy
+npx @deepseek-ai/dsh web
+```
+
+Historical `/autonomy` commands remain in the session log and have no effect after removal.
+
+## Permissions and data
+
+The plugin records mode changes in DSH's existing session log and creates no separate database or configuration directory. The host plugin does not make network requests, collect telemetry, access provider credentials, or read or write workspace files. The browser control sends mode commands to the local DSH command service; each command affects only its selected session.
+
+Like other Cordis plugins, it runs with the privileges of the DSH host process. Review the source before installing it in an environment with sensitive data.
+
+## Contributing
+
+From a local checkout, run:
 
 ```sh
 pnpm install
@@ -153,10 +140,10 @@ pnpm run check
 pnpm run pack:check
 ```
 
-The package contains one DSH host plugin and one browser client bundle. Tests use the real DSH session, command, system-prompt, tool, agent-scope, and execution services; only the Agent object is kept minimal.
+`check` runs type checking, host and client tests, and a production build. CI also validates package contents and exercises installation, Web loading, and removal in an isolated profile. See [CONTRIBUTING.md](CONTRIBUTING.md) for setup and compatibility checks.
 
-CI runs type checking, the host and client test suites, a production build, packed-file inspection, and `publint` package validation. Scheduled compatibility jobs resolve and test the exact versions currently published under DSH `latest`, `next`, and `alpha`, then boot an isolated authenticated Web profile and fetch the plugin from the generated module route.
+This plugin grew out of the workflow proposed in [DeepSeek Harness Discussion #1644](https://github.com/deepseek-ai/deepseek-harness/discussions/1644).
 
-## Status
+## License
 
-MVP for the DeepSeek Harness developer preview. Compatibility-breaking upstream changes are expected while DSH remains in preview.
+[MIT](LICENSE).

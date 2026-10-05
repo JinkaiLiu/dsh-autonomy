@@ -1,147 +1,138 @@
 # dsh-autonomy
 
+[![npm version](https://img.shields.io/npm/v/dsh-autonomy)](https://www.npmjs.com/package/dsh-autonomy)
+[![CI](https://github.com/JinkaiLiu/dsh-autonomy/actions/workflows/ci.yml/badge.svg)](https://github.com/JinkaiLiu/dsh-autonomy/actions/workflows/ci.yml)
+
 [English](README.md) | 简体中文
 
-无需离开当前 DeepSeek Harness 会话，即可在 **Chat** 与 **Agent** 之间切换。
+**在同一个 DeepSeek Harness 会话中，随时切换 Chat 与 Agent。**
 
-`dsh-autonomy` 会在 Web 输入框上方增加一行始终可见的 `Chat | Agent` 控件。它不会覆盖文本框，也不会占用输入框的工具栏。模式属于当前会话，刷新和恢复后仍然保留，并通过持久会话日志跟随 fork。
+`dsh-autonomy` 是一个 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) 插件，在 Web 输入框上方添加 **Chat | Agent** 切换控件。先用 Chat 讨论方案，准备好后切到 Agent 执行，整个过程沿用同一段对话。
 
-## 为什么需要它
+| 模式 | 适合做什么 | 行为 |
+| --- | --- | --- |
+| **Chat** | 提问、解释、讨论方案 | 以文字回答，模型看不到工具，也无法执行工具调用。 |
+| **Agent** | 调查问题、修改文件、执行命令 | 使用 DSH 原有的工具和自动执行流程，遵循现有权限策略。 |
 
-有时你希望 Harness 调查问题、修改文件、执行命令并持续工作；有时你只需要一个简洁回答，希望自己掌握下一步。
+[快速开始](#快速开始) · [配置](#配置) · [兼容性](#兼容性) · [故障排查](#故障排查)
 
-切换 agent preset 无法很好地解决会话中途的这种变化。`dsh-autonomy` 只改变当前会话的自主执行状态，不会替换模型、preset、历史、sandbox 或 permission policy。
+## 快速开始
 
-这个插件源于 [DeepSeek Harness Discussion #1644](https://github.com/deepseek-ai/deepseek-harness/discussions/1644) 中提出的需求。
-
-## 控制自主执行，而不是设置 token 硬上限
-
-当你只需要回答、解释或紧密协作时，Chat 模式可以减少意外的 token 消耗：
-
-- 从模型请求中移除工具 schema；
-- 阻止自主工具循环和后续执行步骤。
-
-这可以避免 [Discussion #1644](https://github.com/deepseek-ai/deepseek-harness/discussions/1644) 中描述的 agent 会话失控消耗。
-
-`dsh-autonomy` 不是 token 预算管理器，也不是硬性使用上限。对话历史、提示词大小、模型输出和供应商价格仍然决定最终成本。它控制的是何时允许 agent 执行。
-
-| 模式 | 模型看到工具 | 工具执行 | 典型回合 |
-| --- | --- | --- | --- |
-| **Chat** | 否 | 拒绝 | 一次文本回答 |
-| **Agent** | 原始 DSH 工具集 | 原始 DSH 策略 | 正常 agent 循环 |
-
-## 安装
-
-`dsh-autonomy 0.1.4` 以 DSH `0.2.0-rc.2` 为开发基线，并支持 `0.2.1-alpha.1`。兼容检查仍覆盖 `0.1.0-rc.6`、`0.1.0-rc.7`、`0.1.1-rc.2`、`0.1.2-rc.1`、`0.1.7-alpha.2` 和 `0.1.7-rc.2`。Node.js 版本要求为 `^22.19.0` 或 `>=24.0.0`。
-
-先确认 DeepSeek Harness CLI 可用，不要求全局安装：
-
-```sh
-npx @deepseek-ai/dsh --version
-```
-
-从 npm 安装：
+需要已配置好的 DeepSeek Harness，以及 Node.js `^22.19.0 || >=24.0.0`。将插件安装到 Web profile（配置方案）中，然后启动 DSH Web：
 
 ```sh
 npx @deepseek-ai/dsh plugin --profile web add dsh-autonomy
 npx @deepseek-ai/dsh web
 ```
 
-如果 DSH Web 在安装时已经运行，请用 `Ctrl+C` 停止后重新启动。正在运行的进程不会热加载刚安装的插件。如果默认端口已被占用，请停止旧进程，或使用其他端口测试：`npx @deepseek-ai/dsh web --port 3081`。
+这些命令通过 `npx` 调用官方 CLI，无需全局安装 `dsh`。安装命令会同时添加插件的服务端功能和 Web 控件。
 
-从本地源码安装：
+如果 DSH Web 已在运行，用 `Ctrl+C` 停止后重新启动，让它加载插件。
 
-```sh
-pnpm install
-pnpm run build
-npx @deepseek-ai/dsh plugin --profile web add /absolute/path/to/dsh-autonomy
-npx @deepseek-ai/dsh web
-```
-
-包中声明了 DSH bundle，因此 `dsh plugin` 会同时把 Host 行为和 Web 客户端控件加入指定 profile。
-
-通过 GitHub 源码安装时，DSH 的 pnpm profile 必须允许本包的 `prepare` 构建。registry release 或预构建 tarball 已包含构建产物，不需要安装期构建权限。
-
-## 卸载
-
-从安装时使用的同一个 profile 中移除 bundle，然后重启 DSH Web：
-
-```sh
-npx @deepseek-ai/dsh plugin --profile web remove dsh-autonomy
-npx @deepseek-ai/dsh web
-```
-
-插件不会创建单独的数据库或配置目录。历史 `/autonomy` 命令记录仍属于会话日志，但插件移除后不会再产生作用。
-
-## 使用
-
-点击输入框上方的 `Chat` 或 `Agent`，也可以输入：
+打开会话，点击输入框上方的 **Chat** 或 **Agent**。也可以输入斜杠命令：
 
 ```text
 /autonomy chat
 /autonomy agent
 ```
 
-每次有效切换都会立即写入 DSH 内置命令日志，即使当时仍有回合在进行。这个记录同时驱动 UI、跨重启恢复状态，并立即更新策略门禁，无需等待下一次模型步骤。
+默认模式为 **Agent**。每个会话独立保存自己的选择，刷新页面、重启 DSH 或恢复会话后仍然保留；通过 fork 派生的会话会继承其历史中记录的模式。切换时，模型、预设、对话历史和未发送的草稿都保持不变。
 
-## Chat 模式如何执行约束
+任务进行中也可以切换。切换会立即影响尚未通过执行检查的工具调用。
 
-Chat 模式使用三个互相对齐的层次：
+> **已经开始的操作：** 切到 Chat 后，已经开始执行的工具仍可完成，之前产生的修改也不会回滚。如果要取消当前回合，请使用 DSH 的 **Stop** 控件。
 
-1. 限制 agent 继承的工具表面；
-2. 从最终模型请求中移除所有剩余工具 schema，包括保留的 Code Mode transport；
-3. 如果 provider 仍然发出已记忆或未声明的工具调用，在执行阶段拒绝它。
+<details>
+<summary>从本地源码安装</summary>
 
-它还会加入一段简短系统指令，让模型直接回答；任务确实需要执行时，请用户切回 Agent。
+需要 pnpm `11.7.0`。将 `/absolute/path/to/dsh-autonomy` 替换为克隆后的项目目录绝对路径。
 
-这比只用提示词要求“不要使用工具”更强，也比在第二步拒绝执行更可靠：模型可能在第一次响应中就请求工具，因此仅限制步骤数并不能形成 Chat 模式。
+```sh
+git clone https://github.com/JinkaiLiu/dsh-autonomy.git
+cd dsh-autonomy
+pnpm install
+pnpm run build
+npx @deepseek-ai/dsh plugin --profile web add /absolute/path/to/dsh-autonomy
+npx @deepseek-ai/dsh web
+```
 
-## 重要边界
+</details>
 
-切到 Chat 会阻止尚未通过执行门禁的工具调用。已经进入工具主体的操作不会因模式切换而取消，更早产生的副作用也不会回滚。如果你希望该操作正常完成，无需再做什么；只有希望取消当前回合时，才需要使用现有的 Stop 控件。
+## 工作原理
 
-Chat 模式不会削弱或替换 DSH 的 sandbox 与 permission policy。Agent 模式恢复组合后的原始工具行为，现有策略仍然决定这些工具能否执行。
+Chat 模式限制当前会话的工具访问，从最终模型请求中移除所有工具定义（包括 DSH 保留的 Code Mode 工具），并在执行时拦截工具调用。它还会添加一段简短的系统指令，让模型直接回答，并在任务需要实际操作时提示用户切换到 Agent。
 
-## 权限与数据
+Agent 模式恢复 DSH 原有的工具访问和自动执行流程。两种模式都遵循 DSH 现有的沙箱和权限策略。
 
-与其他受信任的 Cordis 插件一样，`dsh-autonomy` 运行在 DSH Host 进程内。它：
+每次成功切换都会写入 DSH 内置的会话命令日志。Web 控件和服务端逻辑通过同一份记录恢复模式。
 
-- 不发起网络请求，不收集遥测，也不读取 provider 凭据；
-- 不读取或写入工作区文件；
-- 只通过 DSH 现有的会话命令日志记录模式切换；
-- 只修改对应会话的工具可见性和执行策略；
-- 浏览器控件只向本地 DSH command 服务发送 `/autonomy chat` 或 `/autonomy agent`。
-
-安装任何第三方 DSH 插件，都会让其代码以 DSH 进程的权限执行。在持有敏感数据的环境中安装前，请检查源码和包内容。
-
-## 故障排查
-
-- **没有看到切换控件：** 安装后重启 DSH Web，确认插件加入的是 `web` profile，然后刷新浏览器。
-- **出现 `unknown command: /autonomy`：** Web 客户端已加载，但 Host bundle 没有加载。停止所有旧 DSH 进程，再使用同一个 profile 启动。
-- **默认端口被占用：** 停止旧进程，或改用其他端口，例如 `npx @deepseek-ai/dsh web --port 3081`。
-- **从 GitHub 源码安装时要求构建授权：** 在对应 profile 中允许本包的 `prepare`，或改用预构建 npm release。
-- **切到 Chat 时工具已经开始运行：** 如果希望它正常完成，无需再做什么。只有希望取消当前回合时才使用 Stop；模式切换无法回滚更早产生的副作用。
-
-报告问题时，请提供 DSH 版本、插件版本、安装命令、使用的 profile、操作系统和首条相关 Host 错误。
+Chat 省去了工具定义和自主工具循环，可以减少部分 token 消耗。插件不设置 token 预算或使用上限，实际成本仍取决于对话历史、提示词大小、模型输出和服务商价格。
 
 ## 配置
 
-在 profile 的 `cordis.patch.yml` 中覆盖已安装行：
+安装后无需额外配置。如果希望尚未选择过模式的会话默认使用 Chat，可以修改 Web profile 的 `cordis.patch.yml` 中已有的 `autonomy` 条目：
 
 ```yaml
 - id: autonomy
   config:
-    defaultMode: agent
-    chatGuidance: >-
-      You are in Chat mode. Answer directly in text. Do not use tools or take actions.
-      Ask the user to switch to Agent mode when the request requires execution.
-    denyMessage: >-
-      Chat mode does not allow tool execution. Switch to Agent mode to use tools.
+    defaultMode: chat
 ```
 
-默认模式是 `agent`，引导文字与上面的内容等价。
+| 选项 | 默认值 | 用途 |
+| --- | --- | --- |
+| `defaultMode` | `agent` | 会话尚未保存模式时的默认值，可选 `chat` 或 `agent`。 |
+| `chatGuidance` | 内置 Chat 指令 | Chat 模式下添加的系统指令。 |
+| `denyMessage` | 内置工具拒绝提示 | Chat 模式拦截工具调用时返回的错误信息。 |
 
-## 开发
+修改 `defaultMode` 不会覆盖已有会话保存的选择。自定义提示文字也不会改变工具限制。
+
+## 兼容性
+
+`dsh-autonomy 0.1.4` 以 DSH `0.2.0-rc.2` 为开发基线，同时支持 DSH `0.2.1-alpha.1`。各版本的验证记录见[更新日志](CHANGELOG.md)。
+
+<details>
+<summary>CI 覆盖的早期 DSH 版本</summary>
+
+- `0.1.0-rc.6` 和 `0.1.0-rc.7`
+- `0.1.1-rc.2`
+- `0.1.2-rc.1`
+- `0.1.7-alpha.2` 和 `0.1.7-rc.2`
+
+</details>
+
+定时 CI 还会检查 DSH 的 `latest`、`next` 和 `alpha` 标签当前对应的精确版本。插件目前仍是面向 DSH 开发预览版的早期版本，上游变更可能需要插件同步更新。
+
+## 故障排查
+
+| 现象 | 排查方法 |
+| --- | --- |
+| 没有出现切换控件 | 确认安装到了 `web` profile，重启 DSH Web 后刷新浏览器。 |
+| `unknown command: /autonomy` | 浏览器控件已加载，但服务端插件未加载。停止旧 DSH 进程，再用相同 profile 启动。 |
+| 默认端口被占用 | 停止旧进程，或使用 `npx @deepseek-ai/dsh web --port 3081` 更换端口。 |
+| 从 GitHub 源码安装时要求构建授权 | 在对应 profile 中允许本包的 `prepare` 脚本，或改用已构建好的 npm 版本。 |
+
+如果问题仍然存在，请[提交 issue](https://github.com/JinkaiLiu/dsh-autonomy/issues)，附上 DSH 和插件版本、安装命令、使用的 profile、操作系统，以及首条相关服务端错误。安全问题请按 [SECURITY.md](SECURITY.md) 的说明报告。
+
+## 卸载
+
+从安装时使用的 profile 中移除插件，然后重启 DSH Web：
+
+```sh
+npx @deepseek-ai/dsh plugin --profile web remove dsh-autonomy
+npx @deepseek-ai/dsh web
+```
+
+历史 `/autonomy` 命令仍会保留在会话日志中，卸载后不再产生作用。
+
+## 权限与数据
+
+插件只通过 DSH 现有的会话日志保存模式，不创建额外的数据库或配置目录。服务端插件不发起网络请求、不收集遥测、不访问服务商凭据，也不读写工作区文件。浏览器控件向本地 DSH 命令服务发送模式切换命令，每条命令只影响选中的会话。
+
+与其他 Cordis 插件一样，它以 DSH 服务端进程的权限运行。在包含敏感数据的环境中安装前，请先检查源码。
+
+## 参与开发
+
+在本地项目目录运行：
 
 ```sh
 pnpm install
@@ -149,10 +140,10 @@ pnpm run check
 pnpm run pack:check
 ```
 
-本包包含一个 DSH Host 插件和一个浏览器客户端 bundle。测试使用真实的 DSH session、command、system-prompt、tool、agent-scope 与 execution 服务，仅对 Agent 对象使用最小替身。
+`check` 会执行类型检查、服务端与客户端测试，以及生产构建。CI 还会检查打包内容，并在隔离 profile 中验证安装、Web 加载和卸载。开发环境与兼容性检查的详细说明见 [CONTRIBUTING.md](CONTRIBUTING.md)。
 
-CI 会执行类型检查、Host 与客户端测试、生产构建、打包文件检查和 `publint` 包验证。定时兼容任务会分别解析 DSH `latest`、`next` 与 `alpha` 当前指向的精确版本，运行完整检查，然后启动隔离且带鉴权的 Web profile，并从生成的模块地址获取插件 bundle。
+插件源于 [DeepSeek Harness Discussion #1644](https://github.com/deepseek-ai/deepseek-harness/discussions/1644) 中提出的协作方式。
 
-## 状态
+## 许可证
 
-这是面向 DeepSeek Harness developer preview 的 MVP。DSH 仍处于预览阶段，预计会出现破坏兼容性的上游变化。
+[MIT](LICENSE)。
