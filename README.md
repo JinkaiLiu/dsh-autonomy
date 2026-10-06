@@ -9,6 +9,10 @@ English | [简体中文](README.zh.md)
 
 `dsh-autonomy` is a [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) plugin that adds a **Chat | Agent** switch above the Web input. Discuss an approach in Chat, switch to Agent when you're ready to execute, and keep the conversation going.
 
+![Switch from Chat to Agent and back in DSH Web while keeping the same draft](https://raw.githubusercontent.com/JinkaiLiu/dsh-autonomy/main/.github/assets/autonomy-demo.gif)
+
+*Chat → Agent → Chat, in the same session. Your unsent draft stays in place.*
+
 | Mode | Use it for | Behavior |
 | --- | --- | --- |
 | **Chat** | Questions, explanations, planning | Answers in text. Tools are hidden from the model and tool execution is blocked. |

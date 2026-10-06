@@ -9,6 +9,10 @@
 
 `dsh-autonomy` 是一个 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) 插件，在 Web 输入框上方添加 **Chat | Agent** 切换控件。先用 Chat 讨论方案，准备好后切到 Agent 执行，整个过程沿用同一段对话。
 
+![在 DSH Web 的同一会话中切换 Chat 与 Agent，输入框中的草稿始终保留](https://raw.githubusercontent.com/JinkaiLiu/dsh-autonomy/main/.github/assets/autonomy-demo.gif)
+
+*Chat → Agent → Chat，全程沿用同一个会话，未发送的草稿始终保留。*
+
 | 模式 | 适合做什么 | 行为 |
 | --- | --- | --- |
 | **Chat** | 提问、解释、讨论方案 | 以文字回答，模型看不到工具，也无法执行工具调用。 |
