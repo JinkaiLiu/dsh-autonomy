@@ -1,4 +1,6 @@
 # Keep upstream prerelease peers on the API family used for development.
 overrides:
+  # Share the schema implementation used by current DSH projection packages.
+  zod: 4.4.3
   '@deepseek-ai/dsh-sandbox': 0.2.0-rc.2
   '@deepseek-ai/dsh-sandbox-policy': 0.2.0-rc.2
