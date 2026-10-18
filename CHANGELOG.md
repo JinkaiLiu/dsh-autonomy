@@ -2,6 +2,22 @@
 
 All notable changes to `dsh-autonomy` are documented here.
 
+## 0.1.5 - 2026-10-18
+
+### Fixed
+
+- Pin Zod to `4.4.3`, matching the exact version used by current DSH
+  session-projection packages. Mixing it with the plugin's former `4.6.5`
+  dependency caused TypeScript error TS2589 during projection registration
+  with DSH `0.2.1-rc.2` and `0.2.1-alpha.5`.
+
+### Changed
+
+- Declare supported host versions through `engines.dsh`, as recognized by
+  the newer plugin compatibility check.
+- Add pinned CI checks for DSH `0.2.1-rc.2` and `0.2.1-alpha.5`, retaining
+  the `0.2.0-rc.2` development baseline and all existing compatibility checks.
+
 ## 0.1.4 - 2026-10-03
 
 ### Changed

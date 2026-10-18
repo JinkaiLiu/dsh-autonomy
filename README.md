@@ -92,7 +92,7 @@ Changing `defaultMode` keeps existing sessions' saved selections. Customizing th
 
 ## Compatibility
 
-For `dsh-autonomy 0.1.4`, the development baseline is DSH `0.2.0-rc.2`; DSH `0.2.1-alpha.1` is also supported. See the [changelog](CHANGELOG.md) for release verification.
+For `dsh-autonomy 0.1.5`, the development baseline is DSH `0.2.0-rc.2`; DSH `0.2.1-rc.2`, `0.2.1-alpha.1`, and `0.2.1-alpha.5` are also supported. The package declares its supported DSH versions through `engines.dsh`. See the [changelog](CHANGELOG.md) for release verification.
 
 <details>
 <summary>Earlier DSH releases covered by CI</summary>

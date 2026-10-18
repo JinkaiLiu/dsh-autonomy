@@ -92,7 +92,7 @@ Chat 省去了工具定义和自主工具循环，可以减少部分 token 消�
 
 ## 兼容性
 
-`dsh-autonomy 0.1.4` 以 DSH `0.2.0-rc.2` 为开发基线，同时支持 DSH `0.2.1-alpha.1`。各版本的验证记录见[更新日志](CHANGELOG.md)。
+`dsh-autonomy 0.1.5` 以 DSH `0.2.0-rc.2` 为开发基线，同时支持 DSH `0.2.1-rc.2`、`0.2.1-alpha.1` 和 `0.2.1-alpha.5`。包中通过 `engines.dsh` 声明支持的 DSH 版本。各版本的验证记录见[更新日志](CHANGELOG.md)。
 
 <details>
 <summary>CI 覆盖的早期 DSH 版本</summary>
