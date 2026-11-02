@@ -27,6 +27,15 @@ const CONFIG: Config = {
 }
 
 const autonomyFibers = new WeakMap<Context, { dispose: () => Promise<void> }>()
+const batchTools = 'setExecutor' in ToolRuntime.prototype
+
+async function installTools(ctx: Context, mode: 'native' | 'ptc' = 'native') {
+  await ctx.plugin(ToolRuntime, batchTools ? {} : { mode })
+  if (batchTools) {
+    const name = `@deepseek-ai/dsh-tool-executor-${mode}`
+    await ctx.plugin(await import(name))
+  }
+}
 
 function eventsOf(session: Session): readonly SessionEvent[] {
   const compatible = session as Session & {
@@ -44,7 +53,7 @@ async function setup(config: Partial<Config> | null = CONFIG): Promise<Context> 
   const ctx = new Context()
   await ctx.plugin(SessionStore)
   await ctx.plugin(SystemPrompt)
-  await ctx.plugin(ToolRuntime)
+  await installTools(ctx)
   await ctx.plugin(AgentRegistry)
   await ctx.plugin(CommandRuntime)
   await ctx.plugin(SessionProjections)
@@ -124,14 +133,27 @@ async function assembly(ctx: Context, agent: Agent) {
   return ctx.systemPrompt.assemble({ agent, scope: agent })
 }
 
-async function executeProbe(ctx: Context, agent: Agent) {
+async function executeTool(ctx: Context, agent: Agent, name: string, args = {}, toolSet?: unknown) {
+  if (batchTools) {
+    const batch = await ctx.tools.execute({
+      calls: [{ type: 'tool-call', id: callId(`call-${eventsOf(agent.session).length}`), name, arguments: JSON.stringify(args) }],
+      agent,
+      toolSet,
+      signal: new AbortController().signal,
+    })
+    return batch.results[0].result
+  }
   return ctx.tools.execute({
     callId: callId(`call-${eventsOf(agent.session).length}`),
-    name: 'probe',
-    arguments: {},
+    name,
+    arguments: args,
     agent,
     signal: new AbortController().signal,
   })
+}
+
+async function executeProbe(ctx: Context, agent: Agent) {
+  return executeTool(ctx, agent, 'probe')
 }
 
 describe('foldAutonomyMode', () => {
@@ -299,13 +321,7 @@ describe('Chat and Agent behavior', () => {
     }))
     const agent = await createAgent(ctx, 'already-running')
 
-    const running = ctx.tools.execute({
-      callId: callId('call-already-running'),
-      name: 'slow-probe',
-      arguments: {},
-      agent,
-      signal: new AbortController().signal,
-    })
+    const running = executeTool(ctx, agent, 'slow-probe')
     await started
 
     await command(ctx, agent, 'chat')
@@ -339,6 +355,106 @@ describe('Chat and Agent behavior', () => {
     expect((await executeProbe(ctx, agent)).isError).toBe(false)
   })
 
+  it('hides scope-local and independently provided schemas without changing other sessions', async () => {
+    const ctx = await setup()
+    const agent = await createAgent(ctx, 'local-tools')
+    const other = await createAgent(ctx, 'other-tools')
+    let calls = 0
+    agent.ctx.tools.register(defineTool({
+      name: 'local-probe', description: 'A scope-local tool.', parameters: {},
+      output: { schema: { type: 'string' }, render: (_args, value) => [{ type: 'text', text: value }] },
+      execute: async () => { calls++; return 'local result' },
+    }))
+    ctx.systemPrompt.tools(() => ({ schemas: [{
+      name: 'provider-probe', description: 'An independent schema provider.',
+      parameters: { type: 'object', properties: {} },
+    }] }))
+    const original = await assembly(ctx, agent)
+    expect(original.tools.map(tool => tool.name)).toContain('local-probe')
+    expect(original.tools.map(tool => tool.name)).toContain('provider-probe')
+    await command(ctx, agent, 'chat')
+    expect((await assembly(ctx, agent)).tools).toEqual([])
+    expect((await ctx.systemPrompt.assemble({ scope: agent })).tools).toEqual([])
+    expect((await assembly(ctx, other)).tools.map(tool => tool.name)).toContain('probe')
+    expect((await executeTool(ctx, agent, 'local-probe')).isError).toBe(true)
+    expect(calls).toBe(0)
+    await command(ctx, agent, 'agent')
+    expect((await assembly(ctx, agent)).tools).toEqual(original.tools)
+    expect((await executeTool(ctx, agent, 'local-probe')).isError).toBe(false)
+    expect(calls).toBe(1)
+  })
+
+  it('keeps later assembly wrappers intact on unload and supports reloading', async () => {
+    const ctx = await setup()
+    const agent = await createAgent(ctx, 'reload')
+    const previous = ctx.systemPrompt.assemble
+    const later = async function (context) {
+      return { ...await previous.call(this, context), variables: { marker: 'preserved' } }
+    }
+    Object.defineProperty(ctx.systemPrompt, 'assemble', { configurable: true, writable: true, value: later })
+    await command(ctx, agent, 'chat')
+    expect((await assembly(ctx, agent)).tools).toEqual([])
+    await autonomyFibers.get(ctx)?.dispose()
+    expect(Object.getOwnPropertyDescriptor(ctx.systemPrompt, 'assemble')?.value).toBe(later)
+    expect((await assembly(ctx, agent)).tools.map(tool => tool.name)).toEqual(['probe'])
+    const reloaded = await ctx.plugin(apply, CONFIG)
+    expect((await assembly(ctx, agent)).tools).toEqual([])
+    expect((await assembly(ctx, agent)).variables.marker).toBe('preserved')
+    await reloaded.dispose()
+    expect((await assembly(ctx, agent)).tools.map(tool => tool.name)).toEqual(['probe'])
+  })
+
+  it.skipIf(!batchTools)('preserves step admission and blocks calls admitted before switching to Chat', async () => {
+    const ctx = await setup()
+    const agent = await createAgent(ctx, 'admission')
+    agent.ctx.tools.register(defineTool({
+      name: 'conditional', description: 'A conditionally admitted tool.', parameters: {},
+      output: { schema: { type: 'string' }, render: (_args, value) => [{ type: 'text', text: value }] },
+      execute: async () => 'conditional result',
+    }), { when: () => true })
+    const admitted = await ctx.tools.resolve({ agent, modelSelection: { provider: 'test', model: 'test' }, signal: new AbortController().signal })
+    const request = () => ctx.systemPrompt.assemble({ agent, scope: agent, toolSet: admitted })
+    expect((await request()).tools.map(tool => tool.name)).toContain('conditional')
+    await command(ctx, agent, 'chat')
+    expect((await request()).tools).toEqual([])
+    expect((await executeTool(ctx, agent, 'conditional', {}, admitted)).isError).toBe(true)
+    await command(ctx, agent, 'agent')
+    expect((await executeTool(ctx, agent, 'conditional', {}, admitted)).isError).toBe(false)
+    admitted.dispose()
+    expect((await request()).tools).toEqual([])
+    expect((await executeTool(ctx, agent, 'conditional', {}, admitted)).isError).toBe(true)
+  })
+
+  it.skipIf(!batchTools)('hides and guards the real PTC transport and restores its executor', async () => {
+    const ctx = await setup()
+    const agent = await createAgent(ctx, 'ptc')
+    let runs = 0
+    ctx.provide('workingDirectory', { ensure: async () => '/tmp' })
+    ctx.provide('ptcRuntime', {
+      language: 'typescript', programFormat: 'function-body',
+      resolve: request => ({ ...request, cwd: '/tmp', timeoutMs: 1000 }),
+      run: async () => { runs++; return { value: 'ptc result', logs: [] } },
+      release: async () => {},
+    })
+    const name = '@deepseek-ai/dsh-tool-executor-ptc'
+    await agent.ctx.plugin(await import(name))
+    const request = await assembly(ctx, agent)
+    expect(request.tools.map(tool => tool.name)).toEqual(['run_code'])
+    expect(request.sections.some(section => section.name === 'tools:ptc-only')).toBe(true)
+    await command(ctx, agent, 'chat')
+    const chat = await assembly(ctx, agent)
+    expect(chat.tools).toEqual([])
+    expect(chat.sections.some(section => ['tools:sdk', 'tools:ptc-only'].includes(section.name))).toBe(false)
+    const args = { code: 'return "ptc result"', description: 'Return a test result' }
+    expect((await executeTool(ctx, agent, 'run_code', args)).isError).toBe(true)
+    expect(runs).toBe(0)
+    await command(ctx, agent, 'agent')
+    expect((await assembly(ctx, agent)).tools).toEqual(request.tools)
+    const restored = await executeTool(ctx, agent, 'run_code', args)
+    expect(restored.isError, JSON.stringify(restored)).toBe(false)
+    expect(runs).toBe(1)
+  })
+
   it('can default new sessions to Chat mode without writing synthetic events', async () => {
     const ctx = await setup({ ...CONFIG, defaultMode: 'chat' })
     const agent = await createAgent(ctx, 'default-chat')
@@ -351,9 +467,10 @@ describe('Chat and Agent behavior', () => {
     const ctx = new Context()
     await ctx.plugin(SessionStore)
     await ctx.plugin(SystemPrompt)
-    await ctx.plugin(ToolRuntime)
+    await installTools(ctx)
     await ctx.plugin(AgentRegistry)
     await ctx.plugin(CommandRuntime)
+    await ctx.plugin(SessionProjections)
     ctx.tools.register(defineTool({
       name: 'probe',
       description: 'A test tool.',

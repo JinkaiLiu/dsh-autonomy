@@ -2,6 +2,24 @@
 
 All notable changes to `dsh-autonomy` are documented here.
 
+## 0.1.6 - 2026-11-02
+
+### Fixed
+
+- Filter completed prompt assemblies so Chat still removes all model-facing
+  tools on DSH `0.2.2-alpha.2`, whose presentation waterfall no longer owns
+  tool schemas. Retain the host executor, step admission, and execution guard.
+- Remove the new PTC-only guidance in Chat, and restore the original tool
+  surface in Agent. Preserve other sessions and later assembly wrappers on unload.
+- Await session-projection registration on hosts with asynchronous handles.
+
+### Changed
+
+- Declare DSH `0.2.2-alpha.2` and Cordis `4.0.6-alpha.1` compatibility.
+- Pin DSH `0.2.1-rc.5` and `0.2.2-alpha.2` in CI while retaining legacy coverage.
+- Exercise the real native/PTC executors on the newer API, including scope-local
+  tools, independent schema providers, step admission, and plugin reload.
+
 ## 0.1.5 - 2026-10-18
 
 ### Fixed

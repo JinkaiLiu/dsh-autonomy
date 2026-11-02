@@ -11,7 +11,6 @@ import Schema from '@deepseek-ai/schemastery'
 import type { Agent, PreStepDecision } from '@deepseek-ai/dsh-agent'
 import type { CommandId } from '@deepseek-ai/dsh-commands'
 import type { Session, SessionEvent } from '@deepseek-ai/dsh-session'
-import type { PromptAssembly } from '@deepseek-ai/dsh-system-prompt'
 import { z } from 'zod'
 import type { ZodType } from 'zod'
 import type { AutonomyMode, AutonomyProjection } from './types.ts'
@@ -73,7 +72,6 @@ declare module '@deepseek-ai/dsh-session-projection/types' {
 
 interface AgentInstrumentation {
   guard: () => void
-  prompt: () => void
   restriction?: () => void
 }
 
@@ -149,10 +147,44 @@ export function apply(ctx: Context, config?: Partial<Config>): void {
   const runtimeSelections = new WeakMap<object, RuntimeSelection>()
   const instrumented = new Map<Agent, AgentInstrumentation>()
   const agentsBySession = new WeakMap<object, Agent>()
+  const agentsByScope = new WeakMap<object, Agent>()
 
   const effectiveMode = (agent: Agent): AutonomyMode =>
     runtimeSelections.get(agent.session)?.mode
       ?? foldAutonomyMode(sessionEvents(agent.session), settings.defaultMode)
+
+  // DSH 0.2.2 makes the assembly event presentation-only and restores provider
+  // tools after it. Filter the completed public assembly instead, preserving
+  // the host's executor, tool admission, and request logging in both modes.
+  ctx.effect(() => {
+    const prompt = ctx.systemPrompt
+    const descriptor = Object.getOwnPropertyDescriptor(prompt, 'assemble')
+    const assemble = prompt.assemble
+    let active = true
+    const filtered: typeof assemble = async function (this: typeof prompt, context = {}) {
+      const assembly = await assemble.call(this, context)
+      const agent = context.agent ?? (context.scope && agentsByScope.get(context.scope))
+      if (!active || agent === undefined || !instrumented.has(agent)
+        || effectiveMode(agent) !== 'chat') return assembly
+      return {
+        ...assembly,
+        sections: assembly.sections.filter(section =>
+          !['tools:sdk', 'tools:code-only', 'tools:ptc-only'].includes(section.name)),
+        tools: [],
+      }
+    }
+    Object.defineProperty(prompt, 'assemble', {
+      configurable: true, writable: true, value: filtered,
+    })
+    return () => {
+      active = false
+      // A later wrapper may still delegate to ours; leave it intact and make
+      // our retained wrapper inert rather than overwriting another plugin.
+      if (Object.getOwnPropertyDescriptor(prompt, 'assemble')?.value !== filtered) return
+      if (descriptor) Object.defineProperty(prompt, 'assemble', descriptor)
+      else Reflect.deleteProperty(prompt, 'assemble')
+    }
+  }, 'dsh-autonomy: completed prompt assembly')
 
   /** Keep inherited schemas aligned with the selected mode. */
   const syncRestriction = (agent: Agent): void => {
@@ -176,18 +208,19 @@ export function apply(ctx: Context, config?: Partial<Config>): void {
     const state = instrumented.get(agent)
     if (state === undefined) return
     instrumented.delete(agent)
+    agentsByScope.delete(agent)
     agentsBySession.delete(agent.session)
     runtimeSelections.delete(agent.session)
     state.restriction?.()
-    state.prompt()
     state.guard()
   }
 
-  /** Install the two runtime fences that cannot be expressed by restriction alone. */
+  /** Install the execution fence that cannot be expressed by restriction alone. */
   const instrument = (agent: Agent): void => {
     if (instrumented.has(agent)) return
-    const state: AgentInstrumentation = { guard: () => {}, prompt: () => {} }
+    const state: AgentInstrumentation = { guard: () => {} }
     instrumented.set(agent, state)
+    agentsByScope.set(agent, agent)
     agentsBySession.set(agent.session, agent)
 
     try {
@@ -195,24 +228,6 @@ export function apply(ctx: Context, config?: Partial<Config>): void {
       // name even when the current request advertises none.
       state.guard = agent.ctx.tools.guard(() =>
         effectiveMode(agent) === 'chat' ? settings.denyMessage : undefined)
-
-      // ToolRuntime.restrict cannot remove the reserved Code Mode transport or
-      // exact-scope registrations. The final request assembly is authoritative,
-      // so Chat mode clears those too and removes now-inapplicable SDK sections.
-      state.prompt = agent.ctx.on('system-prompt/assemble', async (
-        _assembly,
-        _context,
-        next,
-      ): Promise<PromptAssembly> => {
-        const assembly = await next()
-        if (effectiveMode(agent) !== 'chat') return assembly
-        return {
-          ...assembly,
-          sections: assembly.sections.filter(section =>
-            section.name !== 'tools:sdk' && section.name !== 'tools:code-only'),
-          tools: [],
-        }
-      })
 
       syncRestriction(agent)
     } catch (cause) {
@@ -259,7 +274,7 @@ export function apply(ctx: Context, config?: Partial<Config>): void {
         : '',
   })
 
-  ctx.inject(['sessionProjections'], (projectionCtx) => {
+  ctx.inject(['sessionProjections'], async (projectionCtx) => {
     // DSH 0.1.0 exposes `schema`/`view` directly, while 0.1.1 moves the
     // durable-state schema to `stateSchema` and the public view under `wire`.
     // Keeping both shapes makes one package safe across the two API families.
@@ -292,7 +307,7 @@ export function apply(ctx: Context, config?: Partial<Config>): void {
       },
       stateVersion: 2,
     } as const
-    projectionCtx.sessionProjections.register(definition)
+    await projectionCtx.sessionProjections.register(definition)
   })
 
   ctx.inject(['commands'], (commandCtx) => {

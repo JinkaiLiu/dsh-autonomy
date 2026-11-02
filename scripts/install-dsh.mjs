@@ -17,6 +17,14 @@ const version = release.version
 console.log(`Testing DSH ${channel} at ${version}`)
 const pkg = JSON.parse(await readFile('package.json', 'utf8'))
 const roots = Object.keys(pkg.devDependencies).filter(name => name.startsWith('@deepseek-ai/dsh-'))
+// Newer ToolRuntime releases delegate to separately published executors. The
+// test composition must load the real native/PTC plugins for those releases.
+const toolPackage = await metadata('@deepseek-ai/dsh-tools', version)
+if (toolPackage.exports?.['./pipeline']) {
+  for (const name of ['@deepseek-ai/dsh-tool-executor-native', '@deepseek-ai/dsh-tool-executor-ptc']) {
+    if (!roots.includes(name)) roots.push(name)
+  }
+}
 const seen = new Set()
 let pending = roots
 while (pending.length) {
