@@ -2,7 +2,7 @@
 
 All notable changes to `dsh-autonomy` are documented here.
 
-## 0.1.6 - 2026-11-02
+## 0.1.6 - 2026-11-03
 
 ### Fixed
 
@@ -16,7 +16,8 @@ All notable changes to `dsh-autonomy` are documented here.
 ### Changed
 
 - Declare DSH `0.2.2-alpha.2` and Cordis `4.0.6-alpha.1` compatibility.
-- Pin DSH `0.2.1-rc.5` and `0.2.2-alpha.2` in CI while retaining legacy coverage.
+- Pin DSH `0.2.1-rc.5`, `0.2.2-alpha.2`, and `0.2.2-alpha.3` in CI while
+  retaining legacy coverage.
 - Exercise the real native/PTC executors on the newer API, including scope-local
   tools, independent schema providers, step admission, and plugin reload.
 

@@ -30,9 +30,9 @@ API families and pinned newer releases. Scheduled checks resolve the current
 In a disposable copy of the repository, run:
 
 ```sh
-node scripts/install-dsh.mjs 0.2.2-alpha.2
+node scripts/install-dsh.mjs 0.2.2-alpha.3
 pnpm run check
-DSH_VERSION=0.2.2-alpha.2 bash scripts/smoke-web.sh
+DSH_VERSION=0.2.2-alpha.3 bash scripts/smoke-web.sh
 ```
 
 The installer rewrites `package.json`, `pnpm-workspace.yaml`, and the lockfile
