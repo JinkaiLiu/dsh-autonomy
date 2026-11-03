@@ -24,15 +24,15 @@ pnpm run pack:check
 ## Compatibility checks
 
 The frozen lockfile uses DSH `0.2.0-rc.2`. CI also tests the older supported
-API families and the pinned alpha release. Scheduled checks resolve the current
+API families and pinned newer releases. Scheduled checks resolve the current
 `latest`, `next`, and `alpha` tags.
 
 In a disposable copy of the repository, run:
 
 ```sh
-node scripts/install-dsh.mjs 0.2.1-alpha.5
+node scripts/install-dsh.mjs 0.2.2-alpha.3
 pnpm run check
-DSH_VERSION=0.2.1-alpha.5 bash scripts/smoke-web.sh
+DSH_VERSION=0.2.2-alpha.3 bash scripts/smoke-web.sh
 ```
 
 The installer rewrites `package.json`, `pnpm-workspace.yaml`, and the lockfile
@@ -46,6 +46,13 @@ Zod minor can exceed TypeScript's instantiation limit at projection registration
 Check both the baseline and the pinned newer releases when changing this version.
 
 ## Tests
+
+DSH `0.2.2` owns tool schemas outside the presentation waterfall. The plugin
+filters the completed public `systemPrompt.assemble()` result and retains the
+host executor and step admission. Cover scope-local tools, independent schema
+providers, PTC transport, and disposal when changing this boundary. The matrix
+installer adds the real native/PTC executor plugins for API families that split
+them out of ToolRuntime.
 
 Changes to Host behavior should cover both the advertised tool surface and the execution gate. A Chat-mode test is incomplete if it checks only the system prompt or only the visible tools.
 
