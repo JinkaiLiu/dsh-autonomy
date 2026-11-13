@@ -2,6 +2,19 @@
 
 All notable changes to `dsh-autonomy` are documented here.
 
+## 0.1.7 - Unreleased
+
+### Fixed
+
+- Update Zod to `4.6.6` for DSH `0.2.2-rc.2` / `0.2.2-rc.3`, whose
+  projection schemas require the newer validation API.
+- Resolve the host projection package's Zod dependency in compatibility builds,
+  avoiding recursive comparisons between different Zod API versions.
+
+### Changed
+
+- Add pinned CI coverage for DSH `0.2.2-rc.1`, `0.2.2-rc.2`, and `0.2.2-rc.3`.
+
 ## 0.1.6 - 2026-11-03
 
 ### Fixed

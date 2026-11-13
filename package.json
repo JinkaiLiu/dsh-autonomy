@@ -1,6 +1,6 @@
 {
   "name": "dsh-autonomy",
-  "version": "0.1.6",
+  "version": "0.1.7",
   "description": "Switch between Chat and Agent without leaving your DeepSeek Harness session.",
   "type": "module",
   "main": "lib/index.js",
@@ -121,7 +121,7 @@
   },
   "dependencies": {
     "@deepseek-ai/schemastery": "^3.18.4",
-    "zod": "4.4.3"
+    "zod": "4.6.6"
   },
   "devDependencies": {
     "@deepseek-ai/cordis": "~4.0.4",

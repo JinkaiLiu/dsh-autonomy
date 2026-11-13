@@ -30,9 +30,9 @@ API families and pinned newer releases. Scheduled checks resolve the current
 In a disposable copy of the repository, run:
 
 ```sh
-node scripts/install-dsh.mjs 0.2.2-alpha.3
+node scripts/install-dsh.mjs 0.2.2-rc.3
 pnpm run check
-DSH_VERSION=0.2.2-alpha.3 bash scripts/smoke-web.sh
+DSH_VERSION=0.2.2-rc.3 bash scripts/smoke-web.sh
 ```
 
 The installer rewrites `package.json`, `pnpm-workspace.yaml`, and the lockfile
@@ -40,10 +40,11 @@ for that API family. Do not commit those temporary matrix changes. The Web smoke
 script uses a temporary DSH home, disables telemetry, loads the authenticated
 client bundle, and verifies uninstall. Set `DSH_PORT` if port 3198 is occupied.
 
-Keep the exact Zod dependency aligned with the version used by the current
-DSH session-projection package (`4.4.3`). Mixing its schema types with another
-Zod minor can exceed TypeScript's instantiation limit at projection registration.
-Check both the baseline and the pinned newer releases when changing this version.
+The development workspace pins Zod `4.6.6`. Compatibility installs resolve the
+selected host's session-projection Zod dependency as well as its DSH API family.
+Different Zod versions expose different validation methods; mixing their types
+can exceed TypeScript's instantiation limit at projection registration. Keep
+published-package smoke coverage on both older and newer hosts when changing Zod.
 
 ## Tests
 
