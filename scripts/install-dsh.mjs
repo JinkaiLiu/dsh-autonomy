@@ -19,6 +19,11 @@ const pkg = JSON.parse(await readFile('package.json', 'utf8'))
 const roots = Object.keys(pkg.devDependencies).filter(name => name.startsWith('@deepseek-ai/dsh-'))
 // Newer ToolRuntime releases delegate to separately published executors. The
 // test composition must load the real native/PTC plugins for those releases.
+// Projection schemas must compile against the host's exact Zod API.
+const projectionPackage = await metadata('@deepseek-ai/dsh-session-projection', version)
+const zodVersion = projectionPackage.dependencies?.zod
+if (!zodVersion) throw new Error(`DSH ${version} does not declare its projection Zod dependency`)
+pkg.dependencies.zod = zodVersion
 const toolPackage = await metadata('@deepseek-ai/dsh-tools', version)
 if (toolPackage.exports?.['./pipeline']) {
   for (const name of ['@deepseek-ai/dsh-tool-executor-native', '@deepseek-ai/dsh-tool-executor-ptc']) {
