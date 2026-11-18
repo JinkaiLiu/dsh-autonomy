@@ -2,7 +2,7 @@
 
 All notable changes to `dsh-autonomy` are documented here.
 
-## 0.1.7 - Unreleased
+## Unreleased
 
 ### Fixed
 
