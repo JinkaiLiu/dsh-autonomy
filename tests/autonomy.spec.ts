@@ -52,11 +52,12 @@ function callId(value: string): CallId {
 async function setup(config: Partial<Config> | null = CONFIG): Promise<Context> {
   const ctx = new Context()
   await ctx.plugin(SessionStore)
+  // Newer DSH loads SystemPrompt only after the projection registry is available.
+  await ctx.plugin(SessionProjections)
   await ctx.plugin(SystemPrompt)
   await installTools(ctx)
   await ctx.plugin(AgentRegistry)
   await ctx.plugin(CommandRuntime)
-  await ctx.plugin(SessionProjections)
   const autonomyFiber = config === null
     ? await ctx.plugin(apply)
     : await ctx.plugin(apply, config)
@@ -433,7 +434,11 @@ describe('Chat and Agent behavior', () => {
     ctx.provide('ptcRuntime', {
       language: 'typescript', programFormat: 'function-body',
       resolve: request => ({ ...request, cwd: '/tmp', timeoutMs: 1000 }),
-      run: async () => { runs++; return { value: 'ptc result', logs: [] } },
+      // Older executors read value/logs; newer ones read output blocks.
+    run: async () => {
+      runs++
+      return { value: 'ptc result', logs: [], output: [{ type: 'text' as const, text: 'ptc result' }] }
+    },
       release: async () => {},
     })
     const name = '@deepseek-ai/dsh-tool-executor-ptc'
@@ -466,11 +471,11 @@ describe('Chat and Agent behavior', () => {
   it('instruments agents that already exist when the plugin loads', async () => {
     const ctx = new Context()
     await ctx.plugin(SessionStore)
+    await ctx.plugin(SessionProjections)
     await ctx.plugin(SystemPrompt)
     await installTools(ctx)
     await ctx.plugin(AgentRegistry)
     await ctx.plugin(CommandRuntime)
-    await ctx.plugin(SessionProjections)
     ctx.tools.register(defineTool({
       name: 'probe',
       description: 'A test tool.',
